@@ -138,6 +138,12 @@ def provision(client: SpClient, schema: Schema, perms: dict, apply: bool = False
                 do("UPDATE_FIELD", f"{ln}.{f.name}", upd, ", ".join(f"{k}={v}" for k, v in changes.items()))
             else:
                 rep.add("FIELD", f"{ln}.{f.name}", "OK")
+        for bi in ld.builtin_indexes:
+            h = have.get(bi)
+            if h is not None and h.get("Indexed"):
+                rep.add("FIELD", f"{ln}.{bi}", "OK", "built-in column indexed")
+            else:
+                do("UPDATE_FIELD", f"{ln}.{bi}", lambda ln=ln, bi=bi: client.update_field(ln, bi, {"Indexed": True}), f"index built-in column {bi}")
         # list settings (versioning)
         ls = {**perms["listSettings"].get("_default", {}), **perms["listSettings"].get(ln, {})}
         props = {}

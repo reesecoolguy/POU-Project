@@ -287,6 +287,7 @@ class FakeSharePoint:
         self.fault_before = None   # callable(ctx) -> (status, body) | None
         self.fault_after = None    # callable(ctx, resp) -> resp
         self.request_count = 0
+        self.clock = None          # optional object with .now() -> aware datetime (tests share one clock with the flow runtime)
         for name, m in masks.BUILTIN_MASKS.items():
             self._add_roledef(name, m, builtin=True)
         self._ensure_group("Site Owners")
@@ -499,6 +500,11 @@ class FakeSharePoint:
                 raise SPHttp(404, "-1, System.ArgumentException", f"List '{title}' does not exist at site with URL 'https://fake{self.site_path}'.")
             return self._route_list(ctx, caller, fl, rest, data)
         raise SPHttp(404, "-1", "unhandled route " + rel)
+
+    def _now(self):
+        if self.clock is not None:
+            return self.clock.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+        return now_iso()
 
     def _need_web_manage(self, caller):
         if not (self.effective_mask(caller, None) & masks.FLAGS["ManageWeb"]):
@@ -759,7 +765,7 @@ class FakeSharePoint:
                         raise SPHttp(400, "-2130575163, Microsoft.SharePoint.SPException", "You must specify a value for this required field: Title.")
                 self._check_unique(fl, vals)
                 u = self.user(caller)
-                now = now_iso()
+                now = self._now()
                 vals["Created"], vals["Modified"] = now, now
                 it = {"id": fl.next_id, "fields": vals, "version": 1, "author": u, "editor": u}
                 fl.items[it["id"]] = it
@@ -789,7 +795,7 @@ class FakeSharePoint:
                     if ff.required and n in fields and (new.get(n) is None or new.get(n) == "") and n != "Title":
                         raise SPHttp(400, "-2130575163, Microsoft.SharePoint.SPException", f"You must specify a value for this required field: {ff.display}.")
                 self._check_unique(fl, new, exclude_id=iid)
-                new["Modified"] = now_iso()
+                new["Modified"] = self._now()
                 it["fields"] = new
                 it["version"] += 1
                 it["editor"] = self.user(caller)
@@ -906,7 +912,7 @@ class FakeSharePoint:
         """Fast path for large-list tests: bypasses validation but still enforces unique keys."""
         fl = self.lists[list_title]
         u = self.user(author)
-        now = now_iso()
+        now = self._now()
         with self.lock:
             for r in rows:
                 vals = {n: None for n in fl.fields}

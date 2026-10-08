@@ -103,6 +103,7 @@ class ListDef:
     title_label: str
     fields: list[Field]
     growth: str = ""
+    builtin_indexes: list[str] = field(default_factory=list)
 
     def field(self, name: str) -> Field:
         for f in self.fields:
@@ -149,7 +150,7 @@ def load_schema(path: Path | None = None) -> Schema:
     for ld in raw["lists"]:
         fields = [_field_from(f) for f in ld["fields"]]
         lists[ld["name"]] = ListDef(ld["name"], ld.get("description", ""), ld.get("titleLabel", "Label"),
-                                    fields, ld.get("growth", ""))
+                                    fields, ld.get("growth", ""), list(ld.get("builtinIndexes", [])))
     s = Schema(raw["schemaVersion"], lists, raw)
     validate_schema(s)
     return s
@@ -184,7 +185,7 @@ def validate_schema(s: Schema) -> None:
                     errs.append(f"{ln}.{f.name}: default not in choices")
             if f.type == "Text" and (f.max_length or 255) > 255:
                 errs.append(f"{ln}.{f.name}: single-line text max 255")
-        if len(ld.indexed_names) > MAX_INDEXES:
+        if len(ld.indexed_names) + len(ld.builtin_indexes) > MAX_INDEXES:
             errs.append(f"{ln}: {len(ld.indexed_names)} indexes exceed {MAX_INDEXES}")
     if errs:
         raise SchemaError("; ".join(errs))
