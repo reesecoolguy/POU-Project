@@ -2,6 +2,7 @@
 
 Hourly tick; sends once per day at the configured local hour. Replenishment SUGGESTIONS only.
 
+- **Flow name** (type it EXACTLY; the app refers to the two app-triggered flows by name): `POU-DailyLowStock`
 - **Trigger**: Recurrence 1 h (tick) - Once per local day at LowStockReportHourLocal
 - **Actions** (all levels): 54
 - **Connections**: SharePoint (`shared_sharepointonline`) as the flow service account, Office 365 Outlook (`shared_office365`)

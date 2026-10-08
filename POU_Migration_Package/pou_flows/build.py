@@ -9,7 +9,7 @@ Writes:
   <out>/solution_candidate/             an UNPACKED Power Platform solution tree built to the documented structure   (NOT validated)
   <out>/POU_Flows_solution_CANDIDATE.zip  the same, zipped                                                         (NOT validated)
 
-The solution is only a candidate: it has never been imported into a tenant by us. docs/04_Deployment.md gives the supported
+The solution is only a candidate: it has never been imported into a tenant by us. docs/07_Deployment.md gives the supported
 manual route (build from the action-by-action docs) in case import is refused.
 """
 from __future__ import annotations
@@ -32,7 +32,7 @@ PUBLISHER_PREFIX = "pou"
 FLOWS = [
     ("POU-Session", session.build, "Instant (Power Apps V2)", "On demand from the app"),
     ("POU-ProcessRequest", process.build, "Instant (Power Apps V2)", "On demand from the app / supervisor console"),
-    ("POU-Sweeper", sweeper.build, "Recurrence 5 min", "Every 5 minutes (probe costs ~8 actions when idle)"),
+    ("POU-Sweeper", sweeper.build, "Recurrence 5 min", "Every 5 minutes (probe costs ~6 actions when idle)"),
     ("POU-Monitor", reports.build_monitor, "Recurrence 1 h", "Hourly"),
     ("POU-DailyLowStock", reports.build_lowstock, "Recurrence 1 h (tick)", "Once per local day at LowStockReportHourLocal"),
     ("POU-Reconcile", reports.build_reconcile, "Recurrence 1 h (tick)", "Once per night at ReconcileHourLocal"),
@@ -136,6 +136,7 @@ def count_all(actions: dict) -> int:
 def doc_for(fl, trigger_desc: str, schedule: str) -> str:
     d = fl.definition()
     lines = [f"# {fl.name} - {fl.display}", "", fl.description, "",
+             f"- **Flow name** (type it EXACTLY; the app refers to the two app-triggered flows by name): `{fl.name}`",
              f"- **Trigger**: {trigger_desc} - {schedule}", f"- **Actions** (all levels): {count_all(d['actions'])}",
              f"- **Connections**: SharePoint (`shared_sharepointonline`) as the flow service account" + (", Office 365 Outlook (`shared_office365`)" if "shared_office365" in json.dumps(d) else ""),
              "- **How to read this**: actions are listed in run order. Indented items are inside the parent scope / condition branch / loop. "
@@ -228,7 +229,7 @@ def solution_candidate(out: Path, built: dict):
         "STATUS: CANDIDATE - NOT VALIDATED.\n"
         "This tree follows the documented unpacked layout of a Power Platform solution containing cloud flows (solution.xml, customizations.xml,\n"
         "Workflows/<name>-<guid>.json). It was generated and statically checked, but it has NEVER been imported into a tenant and was NOT produced by\n"
-        "the Power Platform CLI (pac). If the portal refuses it, use the manual route in docs/04_Deployment.md (build each flow from flows/docs/<Flow>.md).\n"
+        "the Power Platform CLI (pac). If the portal refuses it, use the manual route in docs/07_Deployment.md (build each flow from flows/docs/<Flow>.md).\n"
         "After import: open each flow, set the two connections (SharePoint, Office 365 Outlook) to the FLOW SERVICE ACCOUNT, edit the Cfg_SiteUrl action, then turn the flow on.\n",
         encoding="utf-8")
     zpath = out / "POU_Flows_solution_CANDIDATE.zip"

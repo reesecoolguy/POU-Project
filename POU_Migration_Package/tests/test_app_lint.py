@@ -133,3 +133,8 @@ def test_idle_timer_and_settings_are_central(app):
     start = screens.app_props()["OnStart"]
     for key in ("IdleTimeoutMinutes", "MaxAddQty", "AuditConfirmVariance", "LogoutAfterSubmit", "LowStockRule"):
         assert key in start
+
+
+def test_no_layout_warnings(app):
+    warns = [str(p) for p in lint.lint(*app) if p.level == "WARN"]
+    assert not warns, warns

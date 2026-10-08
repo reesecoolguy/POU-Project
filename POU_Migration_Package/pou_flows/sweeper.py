@@ -3,7 +3,7 @@
 * Re-processes requests whose instant call never arrived (Pending) or whose worker died (Processing with a stale claim).
   It runs the SAME core as POU-ProcessRequest, so a half-finished request is resumed from its ledger intent, never repeated.
 * Rejects supervisor-approval requests nobody answered within ApprovalExpiryHours (nothing was changed: NotApplied).
-* Costs ~8 actions when idle (probe -> terminate) so it does not burn flow capacity.
+* Costs ~6 actions when idle (probe -> terminate) so it does not burn flow capacity.
 """
 from __future__ import annotations
 

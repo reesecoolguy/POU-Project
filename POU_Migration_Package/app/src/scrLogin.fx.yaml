@@ -184,7 +184,7 @@ scrLogin As screen:
         Start: =true
         OnTimerEnd: |-
             =If(
-                locBadgePending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+                locBadgePending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
                 Select(btnLogin)
             )
         Fill: =RGBA(0, 0, 0, 0)

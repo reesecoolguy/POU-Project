@@ -311,6 +311,24 @@ def lint(screens: list[Screen], app_props: dict) -> list[Problem]:
         n = len(list(walk(s_.children)))
         if n > 400:
             warn(s_.name, f"{n} controls (keep screens under ~300 for load time)")
+    # ---- layout: everything inside the 1366x768 canvas; unconditional controls must not overlap (conditional ones are checked by hand in T-APP-01)
+    for s_ in screens:
+        boxes = []
+        for c in s_.children:
+            g = {k: c.props.get(k) for k in ("X", "Y", "Width", "Height")}
+            try:
+                x, y, w, h = (float(g[k]) for k in ("X", "Y", "Width", "Height"))
+            except (TypeError, ValueError):
+                continue                                    # formula-driven geometry: skip
+            if x < 0 or y < 0 or x + w > 1366 or y + h > 768:
+                err(f"{s_.name}.{c.name}", f"outside the 1366x768 canvas ({x},{y},{w},{h})")
+            if c.type in ("rectangle", "timer") or c.name.startswith("btnRun") or "Visible" in c.props:
+                continue
+            boxes.append((c.name, x, y, w, h))
+        for i, a in enumerate(boxes):
+            for b in boxes[i + 1:]:
+                if a[1] < b[1] + b[3] and b[1] < a[1] + a[3] and a[2] < b[2] + b[4] and b[2] < a[2] + a[4]:
+                    warn(f"{s_.name}", f"{a[0]} overlaps {b[0]}")
     longest = max(((len(t), w) for _, w, _, t in all_fx), default=(0, ""))
     if longest[0] > 12000:
         warn(longest[1], f"formula is {longest[0]} characters")

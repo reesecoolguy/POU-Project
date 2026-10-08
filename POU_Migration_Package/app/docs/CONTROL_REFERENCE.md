@@ -1,6 +1,6 @@
 # Control reference (generated)
 
-Build id `POU-APP-d414ca54`. Every control of every screen with its exact name, type and Power Fx. If pasting the YAML into Studio is not accepted by your Studio version, build the app by hand from this file: create each control with the listed name and type and paste each formula into the property named.
+Build id `POU-APP-bd33f6ed`. Every control of every screen with its exact name, type and Power Fx. If pasting the YAML into Studio is not accepted by your Studio version, build the app by hand from this file: create each control with the listed name and type and paste each formula into the property named.
 
 Conventions: `varX` global (Set) | `locX` screen context variable | `colX` collection. All geometry values are for a 1366x768 Windows PC screen (App > Settings > Display: Landscape, 1366x768, scale to fit OFF, lock aspect ratio ON).
 
@@ -11,7 +11,7 @@ Conventions: `varX` global (Set) | `locX` screen context variable | `colX` colle
 ```powerfx
 // 1. who/where: the Microsoft account running the app is NOT the employee
 Set(varStation, Upper(Trim(Coalesce(Param("StationID"), LookUp(POUStations, Active = true, ExpectedAccountUPN = Lower(User().Email)).StationID, ""))));
-Set(varBuild, "POU-APP-d414ca54");
+Set(varBuild, "POU-APP-bd33f6ed");
 Set(varRowLimit, 500);
 // 2. central settings (editable in POUSettings); defaults mirror schema/settings_defaults.json
 Set(varSettingsOk, false);
@@ -396,7 +396,7 @@ Navigate(scrSupervisor, ScreenTransition.None)
 
 ```powerfx
 =If(
-    locBadgePending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+    locBadgePending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
     Select(btnLogin)
 )
 ```
@@ -591,7 +591,7 @@ The everyday screen. ADD creates a RECEIPT request, REMOVE an ISSUE request. The
 **Text**
 
 ```powerfx
-="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, TimeUnit.Seconds)) & " s"
 ```
 
 **Color**
@@ -672,7 +672,7 @@ Navigate(scrLogin, ScreenTransition.None)
 ```powerfx
 =Set(varTick, Now());
 If(
-    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, TimeUnit.Seconds) >= varIdleMin * 60,
     If(
         Not(IsBlank(varSession)),
         IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
@@ -968,8 +968,8 @@ Navigate(scrAdmin, ScreenTransition.None)
     IsBlank(varReq) Or varBusy,
     false,
     Set(varBusy, true);
-Set(varOutKind, "");
-Set(varOutText, "");
+Set(varOutKind, "wait");
+Set(varOutText, "Posting... please wait. Do not press anything; this takes several seconds.");
 Set(varLookupFailed, false);
 Set(varFound, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Set(varLookupFailed, true); Blank()));
 Set(varSent, Not(IsBlank(varFound)));
@@ -1375,11 +1375,11 @@ With(
 
 ```powerfx
 =If(
-    locPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+    locPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
     Select(btnFindScan)
 );
 If(
-    locLocPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+    locLocPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
     Select(btnLocScan)
 )
 ```
@@ -2079,7 +2079,7 @@ Blind count. The record's StockVersion is captured when the item is selected (th
 **Text**
 
 ```powerfx
-="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, TimeUnit.Seconds)) & " s"
 ```
 
 **Color**
@@ -2160,7 +2160,7 @@ Navigate(scrLogin, ScreenTransition.None)
 ```powerfx
 =Set(varTick, Now());
 If(
-    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, TimeUnit.Seconds) >= varIdleMin * 60,
     If(
         Not(IsBlank(varSession)),
         IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
@@ -2456,8 +2456,8 @@ Navigate(scrAdmin, ScreenTransition.None)
     IsBlank(varReq) Or varBusy,
     false,
     Set(varBusy, true);
-Set(varOutKind, "");
-Set(varOutText, "");
+Set(varOutKind, "wait");
+Set(varOutText, "Posting... please wait. Do not press anything; this takes several seconds.");
 Set(varLookupFailed, false);
 Set(varFound, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Set(varLookupFailed, true); Blank()));
 Set(varSent, Not(IsBlank(varFound)));
@@ -2811,11 +2811,11 @@ With(
 
 ```powerfx
 =If(
-    locPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+    locPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
     Select(btnFindAudit)
 );
 If(
-    locLocPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+    locLocPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
     Select(btnLocAudit)
 )
 ```
@@ -3471,7 +3471,7 @@ Two request types: ITEM_CREATE (new item master + first location) and LOCATION_A
 **Text**
 
 ```powerfx
-="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, TimeUnit.Seconds)) & " s"
 ```
 
 **Color**
@@ -3552,7 +3552,7 @@ Navigate(scrLogin, ScreenTransition.None)
 ```powerfx
 =Set(varTick, Now());
 If(
-    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, TimeUnit.Seconds) >= varIdleMin * 60,
     If(
         Not(IsBlank(varSession)),
         IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
@@ -3848,8 +3848,8 @@ Navigate(scrAdmin, ScreenTransition.None)
     IsBlank(varReq) Or varBusy,
     false,
     Set(varBusy, true);
-Set(varOutKind, "");
-Set(varOutText, "");
+Set(varOutKind, "wait");
+Set(varOutText, "Posting... please wait. Do not press anything; this takes several seconds.");
 Set(varLookupFailed, false);
 Set(varFound, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Set(varLookupFailed, true); Blank()));
 Set(varSent, Not(IsBlank(varFound)));
@@ -4840,7 +4840,7 @@ Reads the server-maintained LowStockFlag. Items with no verified quantity are no
 **Text**
 
 ```powerfx
-="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, TimeUnit.Seconds)) & " s"
 ```
 
 **Color**
@@ -4921,7 +4921,7 @@ Navigate(scrLogin, ScreenTransition.None)
 ```powerfx
 =Set(varTick, Now());
 If(
-    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, TimeUnit.Seconds) >= varIdleMin * 60,
     If(
         Not(IsBlank(varSession)),
         IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
@@ -5420,7 +5420,7 @@ Left: this station's requests with their real status (AwaitingSupervisor / Pendi
 **Text**
 
 ```powerfx
-="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, TimeUnit.Seconds)) & " s"
 ```
 
 **Color**
@@ -5501,7 +5501,7 @@ Navigate(scrLogin, ScreenTransition.None)
 ```powerfx
 =Set(varTick, Now());
 If(
-    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, TimeUnit.Seconds) >= varIdleMin * 60,
     If(
         Not(IsBlank(varSession)),
         IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
@@ -5830,9 +5830,7 @@ Refresh(POURequests); Refresh(POULedger)
 **Text**
 
 ```powerfx
-=ThisItem.RequestType.Value & "  " & Coalesce(ThisItem.Title, "") & "
-" & ThisItem.RequestStatus.Value & If(ThisItem.IsOpen, "  (open)", "") & "  -  " & Coalesce(ThisItem.ResultMessage, "") & "
-" & Text(ThisItem.Created, "mmm d, h:mm AM/PM") & "  |  request " & Left(ThisItem.RequestID, 8) & If(ThisItem.InventoryEffect.Value = "Unknown", "  |  EFFECT UNKNOWN - tell a supervisor", "")
+=ThisItem.RequestType.Value & "  " & Coalesce(ThisItem.Title, "") & Char(10) & ThisItem.RequestStatus.Value & If(ThisItem.IsOpen, "  (open)", "") & "  -  " & Coalesce(ThisItem.ResultMessage, "") & Char(10) & Text(ThisItem.Created, "mmm d, h:mm AM/PM") & "  |  request " & Left(ThisItem.RequestID, 8) & If(ThisItem.InventoryEffect.Value = "Unknown", "  |  EFFECT UNKNOWN - tell a supervisor", "")
 ```
 
 **Color**
@@ -5940,8 +5938,7 @@ Refresh(POURequests)
 **Text**
 
 ```powerfx
-=ThisItem.LedgerType.Value & If(ThisItem.Origin.Value = "Legacy", " (LEGACY)", "") & " " & ThisItem.ItemID & " @ " & Coalesce(ThisItem.LocationCode, "?") & "  delta " & Coalesce(Text(ThisItem.QtyDelta), "-") & "  -> " & Coalesce(Text(ThisItem.QtyAfter), "-") & "
-" & Coalesce(ThisItem.EmployeeName, ThisItem.LegacyUser, "?") & "  |  " & Coalesce(ThisItem.OccurredLocalText, ThisItem.LegacyTimestampText, Text(ThisItem.OccurredUtc, "mmm d, h:mm AM/PM")) & If(ThisItem.PostingState.Value <> "Posted", "  |  " & ThisItem.PostingState.Value, "")
+=ThisItem.LedgerType.Value & If(ThisItem.Origin.Value = "Legacy", " (LEGACY)", "") & " " & ThisItem.ItemID & " @ " & Coalesce(ThisItem.LocationCode, "?") & "  delta " & Coalesce(Text(ThisItem.QtyDelta), "-") & "  -> " & Coalesce(Text(ThisItem.QtyAfter), "-") & Char(10) & Coalesce(ThisItem.EmployeeName, ThisItem.LegacyUser, "?") & "  |  " & Coalesce(ThisItem.OccurredLocalText, ThisItem.LegacyTimestampText, Text(ThisItem.OccurredUtc, "mmm d, h:mm AM/PM")) & If(ThisItem.PostingState.Value <> "Posted", "  |  " & ThisItem.PostingState.Value, "")
 ```
 
 **Color**
@@ -6086,7 +6083,7 @@ Approve/reject waiting requests, post adjustments, reversals, parameter changes 
 **Text**
 
 ```powerfx
-="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, TimeUnit.Seconds)) & " s"
 ```
 
 **Color**
@@ -6167,7 +6164,7 @@ Navigate(scrLogin, ScreenTransition.None)
 ```powerfx
 =Set(varTick, Now());
 If(
-    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, TimeUnit.Seconds) >= varIdleMin * 60,
     If(
         Not(IsBlank(varSession)),
         IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
@@ -6463,8 +6460,8 @@ Navigate(scrAdmin, ScreenTransition.None)
     IsBlank(varReq) Or varBusy,
     false,
     Set(varBusy, true);
-Set(varOutKind, "");
-Set(varOutText, "");
+Set(varOutKind, "wait");
+Set(varOutText, "Posting... please wait. Do not press anything; this takes several seconds.");
 Set(varLookupFailed, false);
 Set(varFound, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Set(varLookupFailed, true); Blank()));
 Set(varSent, Not(IsBlank(varFound)));
@@ -6800,9 +6797,7 @@ Refresh(POURequests)
 **Text**
 
 ```powerfx
-=ThisItem.RequestType.Value & "   " & Coalesce(ThisItem.Title, "") & "
-" & "Item " & Coalesce(ThisItem.ItemID, "-") & " @ " & Coalesce(ThisItem.LocationCode, "-") & "   qty " & Coalesce(Text(ThisItem.Quantity), "-") & "   counted-from version " & Coalesce(Text(ThisItem.ExpectedVersion), "-") & "
-" & Text(ThisItem.Created, "mmm d, h:mm AM/PM") & "  |  filed by account " & ThisItem.'Created By'.Email & "  |  request " & Left(ThisItem.RequestID, 8)
+=ThisItem.RequestType.Value & "   " & Coalesce(ThisItem.Title, "") & Char(10) & "Item " & Coalesce(ThisItem.ItemID, "-") & " @ " & Coalesce(ThisItem.LocationCode, "-") & "   qty " & Coalesce(Text(ThisItem.Quantity), "-") & "   counted-from version " & Coalesce(Text(ThisItem.ExpectedVersion), "-") & Char(10) & Text(ThisItem.Created, "mmm d, h:mm AM/PM") & "  |  filed by account " & ThisItem.'Created By'.Email & "  |  request " & Left(ThisItem.RequestID, 8)
 ```
 
 **Color**
@@ -7183,11 +7178,11 @@ With(
 
 ```powerfx
 =If(
-    locPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+    locPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
     Select(btnFindSup)
 );
 If(
-    locLocPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+    locLocPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
     Select(btnLocSup)
 )
 ```
@@ -7290,8 +7285,7 @@ SetFocus(txtQtySup)
 **Text**
 
 ```powerfx
-=If(IsBlank(locSel), "", locSel.ItemName & "
-" & locSel.ItemID & " @ " & locSel.LocationCode & "   on hand " & Coalesce(Text(locSel.OnHandQty), "-") & "   record version " & locSel.StockVersion & "   " & locSel.BalanceStatus.Value)
+=If(IsBlank(locSel), "", locSel.ItemName & Char(10) & locSel.ItemID & " @ " & locSel.LocationCode & "   on hand " & Coalesce(Text(locSel.OnHandQty), "-") & "   record version " & locSel.StockVersion & "   " & locSel.BalanceStatus.Value)
 ```
 
 **Color**
@@ -8209,7 +8203,7 @@ Edits central settings and the location list. The app only offers the controls; 
 **Text**
 
 ```powerfx
-="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, TimeUnit.Seconds)) & " s"
 ```
 
 **Color**
@@ -8290,7 +8284,7 @@ Navigate(scrLogin, ScreenTransition.None)
 ```powerfx
 =Set(varTick, Now());
 If(
-    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, TimeUnit.Seconds) >= varIdleMin * 60,
     If(
         Not(IsBlank(varSession)),
         IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)

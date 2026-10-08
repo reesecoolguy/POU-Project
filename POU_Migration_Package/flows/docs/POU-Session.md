@@ -2,6 +2,7 @@
 
 Instant flow. LOGIN validates the badge and station and creates a session bound to the calling Microsoft account. LOGOUT ends it.
 
+- **Flow name** (type it EXACTLY; the app refers to the two app-triggered flows by name): `POU-Session`
 - **Trigger**: Instant (Power Apps V2) - On demand from the app
 - **Actions** (all levels): 67
 - **Connections**: SharePoint (`shared_sharepointonline`) as the flow service account

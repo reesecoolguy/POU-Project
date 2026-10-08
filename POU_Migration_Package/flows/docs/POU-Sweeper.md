@@ -2,7 +2,8 @@
 
 Scheduled every 5 minutes: processes Pending / stale-Processing requests with the same core, expires unanswered supervisor approvals.
 
-- **Trigger**: Recurrence 5 min - Every 5 minutes (probe costs ~8 actions when idle)
+- **Flow name** (type it EXACTLY; the app refers to the two app-triggered flows by name): `POU-Sweeper`
+- **Trigger**: Recurrence 5 min - Every 5 minutes (probe costs ~6 actions when idle)
 - **Actions** (all levels): 239
 - **Connections**: SharePoint (`shared_sharepointonline`) as the flow service account
 - **How to read this**: actions are listed in run order. Indented items are inside the parent scope / condition branch / loop. `Compose_*`, `Set_*` and `Result_*` actions are the decision points; each SharePoint call shows its exact URI and body. Expressions are the literal text to type into the Expression tab (without the leading `@` when you type into the editor's expression box).

@@ -2,6 +2,7 @@
 
 Hourly: raises ONE ops event (and one email) per failed or stuck request / ledger intent.
 
+- **Flow name** (type it EXACTLY; the app refers to the two app-triggered flows by name): `POU-Monitor`
 - **Trigger**: Recurrence 1 h - Hourly
 - **Actions** (all levels): 37
 - **Connections**: SharePoint (`shared_sharepointonline`) as the flow service account, Office 365 Outlook (`shared_office365`)

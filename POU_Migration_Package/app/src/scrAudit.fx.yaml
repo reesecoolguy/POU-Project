@@ -42,7 +42,7 @@ scrAudit As screen:
         Y: =4
         Width: =200
         Height: =24
-        Text: ="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+        Text: ="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, TimeUnit.Seconds)) & " s"
         Size: =12
         Color: =RGBA(255, 255, 255, 1)
         Fill: =RGBA(0, 0, 0, 0)
@@ -88,7 +88,7 @@ scrAudit As screen:
         OnTimerEnd: |-
             =Set(varTick, Now());
             If(
-                (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+                (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, TimeUnit.Seconds) >= varIdleMin * 60,
                 If(
                     Not(IsBlank(varSession)),
                     IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
@@ -252,8 +252,8 @@ scrAudit As screen:
                 IsBlank(varReq) Or varBusy,
                 false,
                 Set(varBusy, true);
-            Set(varOutKind, "");
-            Set(varOutText, "");
+            Set(varOutKind, "wait");
+            Set(varOutText, "Posting... please wait. Do not press anything; this takes several seconds.");
             Set(varLookupFailed, false);
             Set(varFound, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Set(varLookupFailed, true); Blank()));
             Set(varSent, Not(IsBlank(varFound)));
@@ -486,11 +486,11 @@ scrAudit As screen:
         Start: =true
         OnTimerEnd: |-
             =If(
-                locPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+                locPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
                 Select(btnFindAudit)
             );
             If(
-                locLocPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+                locLocPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
                 Select(btnLocAudit)
             )
         Fill: =RGBA(0, 0, 0, 0)
@@ -541,11 +541,11 @@ scrAudit As screen:
             AutoHeight: =false
     lblAudNameAudit As label:
         X: =24
-        Y: =400
+        Y: =430
         Width: =1300
-        Height: =36
+        Height: =30
         Text: =If(IsBlank(locSel), "", locSel.ItemName & "   |   " & locSel.ItemID & " @ " & locSel.LocationCode & "   (count started at record version " & locVer & ")")
-        Size: =20
+        Size: =18
         Color: =RGBA(32, 32, 32, 1)
         Fill: =RGBA(0, 0, 0, 0)
         Align: =Align.Left
@@ -554,9 +554,9 @@ scrAudit As screen:
         AutoHeight: =false
     lblStep3Audit As label:
         X: =24
-        Y: =440
+        Y: =462
         Width: =600
-        Height: =24
+        Height: =22
         Text: ="3  Counted quantity (physical count, 0 or more)"
         Size: =14
         Color: =RGBA(110, 110, 110, 1)
@@ -567,9 +567,9 @@ scrAudit As screen:
         AutoHeight: =false
     txtCountAudit As text:
         X: =24
-        Y: =466
+        Y: =486
         Width: =240
-        Height: =60
+        Height: =56
         HintText: ="Counted quantity"
         Default: =""
         Size: =30
@@ -581,9 +581,9 @@ scrAudit As screen:
         TabIndex: =5
     lblCountHintAudit As label:
         X: =280
-        Y: =466
+        Y: =486
         Width: =820
-        Height: =60
+        Height: =56
         Text: =If(IsBlank(txtCountAudit.Text), "", Not(IsMatch(Trim(txtCountAudit.Text), "^(0|[1-9][0-9]{0,5})$")), "Counted quantity must be a whole number, 0 or more. Was a barcode scanned into this box?", "")
         Size: =14
         Color: =RGBA(156, 0, 6, 1)
@@ -594,9 +594,9 @@ scrAudit As screen:
         AutoHeight: =false
     btnReviewAudit As button:
         X: =24
-        Y: =540
+        Y: =552
         Width: =240
-        Height: =60
+        Height: =56
         Text: ="Review count"
         OnSelect: |-
             =Set(varLastActivity, Now());
@@ -618,7 +618,7 @@ scrAudit As screen:
         TabIndex: =6
     lblReviewAudit As label:
         X: =290
-        Y: =540
+        Y: =552
         Width: =800
         Height: =92
         Text: |-
@@ -628,7 +628,7 @@ scrAudit As screen:
                 IsBlank(locFresh.OnHandQty), "FIRST COUNT. Counted " & Trim(txtCountAudit.Text) & ". There is no previous balance; this count becomes the verified starting quantity.",
                 "Counted " & Trim(txtCountAudit.Text) & "   |   System says " & locFresh.OnHandQty & "   |   Variance " & Text((Value(Trim(txtCountAudit.Text)) - locFresh.OnHandQty), "+0;-0;0")
             )
-        Size: =18
+        Size: =16
         Color: =RGBA(32, 32, 32, 1)
         Fill: =If(And(locReview, Not(IsBlank(locFresh)), locFresh.StockVersion <> locVer), RGBA(255, 199, 206, 1), And(locReview, Not(IsBlank(locFresh.OnHandQty)), Abs((Value(Trim(txtCountAudit.Text)) - locFresh.OnHandQty)) >= varAuditVar), RGBA(255, 230, 153, 1), RGBA(221, 235, 247, 1))
         Align: =Align.Left
@@ -638,9 +638,9 @@ scrAudit As screen:
         Visible: =locReview
     btnRecountAudit As button:
         X: =1110
-        Y: =540
+        Y: =552
         Width: =200
-        Height: =60
+        Height: =56
         Text: ="Recount"
         OnSelect: |-
             =Set(varLastActivity, Now());
@@ -662,7 +662,7 @@ scrAudit As screen:
         X: =24
         Y: =650
         Width: =520
-        Height: =60
+        Height: =56
         Text: =If(And(locReview, Not(IsBlank(locFresh.OnHandQty)), Abs((Value(Trim(txtCountAudit.Text)) - locFresh.OnHandQty)) >= varAuditVar), "Variance is " & Text((Value(Trim(txtCountAudit.Text)) - locFresh.OnHandQty), "+0;-0;0") & " - I recounted. POST COUNT", "POST COUNT")
         OnSelect: |-
             =Set(varLastActivity, Now());
@@ -689,7 +689,7 @@ scrAudit As screen:
         X: =24
         Y: =650
         Width: =520
-        Height: =60
+        Height: =56
         Text: ="Retry same request (" & Left(varReq.RequestID, 8) & ")"
         OnSelect: |-
             =Set(varLastActivity, Now());

@@ -2,6 +2,7 @@
 
 Hourly tick; once per week: orphans, parameters, roles, placeholders; repairs the denormalised ItemName.
 
+- **Flow name** (type it EXACTLY; the app refers to the two app-triggered flows by name): `POU-WeeklyHealth`
 - **Trigger**: Recurrence 1 h (tick) - Weekly on WeeklyDayOfWeek / WeeklyHourLocal
 - **Actions** (all levels): 85
 - **Connections**: SharePoint (`shared_sharepointonline`) as the flow service account, Office 365 Outlook (`shared_office365`)

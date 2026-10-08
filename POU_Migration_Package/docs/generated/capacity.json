@@ -1,0 +1,32 @@
+{
+ "sweeper_idle": 6,
+ "login": 41,
+ "opening": 120,
+ "issue": 112,
+ "receipt": 112,
+ "logout": 32,
+ "monitor_tick_not_due": 7,
+ "lowstock_tick_not_due": 11,
+ "reconcile_tick_not_due": 11,
+ "health_tick_not_due": 11,
+ "usage_tick_not_due": 11,
+ "lowstock_tick_when_due_or_busy": 45,
+ "sharepoint_calls": {
+  "sweeper_idle": 1,
+  "login": 4,
+  "opening_incl_request_create": 19,
+  "issue": 16,
+  "receipt": 16,
+  "logout": 3
+ },
+ "definition_action_totals": {
+  "process": 111412,
+  "session": 23885,
+  "sweeper": 117134,
+  "lowstock": 18986,
+  "reconcile": 22293,
+  "health": 24878,
+  "usage": 13946,
+  "monitor": 17753
+ }
+}

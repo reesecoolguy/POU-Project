@@ -79,10 +79,10 @@ def header(p: str) -> list:
          lbl(f"lblHdrStation{p}", '"Station " & varStation', 12, 4, 260, 28, 16, True, WHITE, note="Station identity (always visible)"),
          lbl(f"lblHdrUser{p}", 'If(varSupMode, varEmpName & " (supervisor, signed in as " & User().Email & ")", varEmpName & " - badge session")',
              12, 32, 560, 28, 14, False, WHITE, note="Employee identity (always visible)"),
-         lbl(f"lblHdrIdle{p}", '"Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"',
+         lbl(f"lblHdrIdle{p}", '"Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, TimeUnit.Seconds)) & " s"',
              1040, 4, 200, 24, 12, False, WHITE, align="Align.Right", note="Idle countdown"),
          btn(f"btnHdrOut{p}", '"Sign out"', F.logout_block(), 1250, 12, 104, 40, fill="RGBA(192, 80, 77, 1)", note="Ends the server session"),
-         tmr(f"tmrIdle{p}", "1000", "Set(varTick, Now());\nIf(\n    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,\n    "
+         tmr(f"tmrIdle{p}", "1000", "Set(varTick, Now());\nIf(\n    (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, TimeUnit.Seconds) >= varIdleMin * 60,\n    "
              + F.logout_block().replace("\n", "\n    ") + "\n)", note="Idle timeout checker (central setting IdleTimeoutMinutes)")]
     x = 580
     for key, cap, scr, vis in NAV:
@@ -162,11 +162,11 @@ With(
             note="Resolves the location scan; also called by the scan timer"),
         tmr(f"tmrScan{p}", "150",
             f"""If(
-    locPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+    locPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
     Select(btnFind{p})
 );
 If(
-    locLocPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+    locLocPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
     Select(btnLoc{p})
 )""", note="Debounce: commits a scan once keystrokes stop for ScanCommitIdleMs, so Enter/Tab/no-suffix scanners all work"),
         lbl(f"lblMsg{p}", "locMsg", 24, y + 80, 1100, 30, 14, True, "RGBA(156, 0, 6, 1)", visible="Not(IsBlank(locMsg))", note="Lookup messages"),

@@ -2,6 +2,7 @@
 
 Instant flow called by the app with a RequestID. Claims the request, validates session/identity/permissions on the server, creates the ledger intent (unique-key compare-and-swap), applies the stock change, marks it Posted, and answers with the real outcome.
 
+- **Flow name** (type it EXACTLY; the app refers to the two app-triggered flows by name): `POU-ProcessRequest`
 - **Trigger**: Instant (Power Apps V2) - On demand from the app / supervisor console
 - **Actions** (all levels): 218
 - **Connections**: SharePoint (`shared_sharepointonline`) as the flow service account

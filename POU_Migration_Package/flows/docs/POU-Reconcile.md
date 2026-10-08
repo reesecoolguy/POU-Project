@@ -2,6 +2,7 @@
 
 Hourly tick; once per night: proves OnHandQty == the ledger row for StockVersion, repairs LowStockFlag, raises ops events, purges old requests/sessions.
 
+- **Flow name** (type it EXACTLY; the app refers to the two app-triggered flows by name): `POU-Reconcile`
 - **Trigger**: Recurrence 1 h (tick) - Once per night at ReconcileHourLocal
 - **Actions** (all levels): 57
 - **Connections**: SharePoint (`shared_sharepointonline`) as the flow service account, Office 365 Outlook (`shared_office365`)

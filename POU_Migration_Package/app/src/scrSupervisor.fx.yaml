@@ -42,7 +42,7 @@ scrSupervisor As screen:
         Y: =4
         Width: =200
         Height: =24
-        Text: ="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+        Text: ="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, TimeUnit.Seconds)) & " s"
         Size: =12
         Color: =RGBA(255, 255, 255, 1)
         Fill: =RGBA(0, 0, 0, 0)
@@ -88,7 +88,7 @@ scrSupervisor As screen:
         OnTimerEnd: |-
             =Set(varTick, Now());
             If(
-                (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+                (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, TimeUnit.Seconds) >= varIdleMin * 60,
                 If(
                     Not(IsBlank(varSession)),
                     IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
@@ -252,8 +252,8 @@ scrSupervisor As screen:
                 IsBlank(varReq) Or varBusy,
                 false,
                 Set(varBusy, true);
-            Set(varOutKind, "");
-            Set(varOutText, "");
+            Set(varOutKind, "wait");
+            Set(varOutText, "Posting... please wait. Do not press anything; this takes several seconds.");
             Set(varLookupFailed, false);
             Set(varFound, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Set(varLookupFailed, true); Blank()));
             Set(varSent, Not(IsBlank(varFound)));
@@ -512,10 +512,7 @@ scrSupervisor As screen:
             Y: =4
             Width: =940
             Height: =72
-            Text: |-
-                =ThisItem.RequestType.Value & "   " & Coalesce(ThisItem.Title, "") & "
-                " & "Item " & Coalesce(ThisItem.ItemID, "-") & " @ " & Coalesce(ThisItem.LocationCode, "-") & "   qty " & Coalesce(Text(ThisItem.Quantity), "-") & "   counted-from version " & Coalesce(Text(ThisItem.ExpectedVersion), "-") & "
-                " & Text(ThisItem.Created, "mmm d, h:mm AM/PM") & "  |  filed by account " & ThisItem.'Created By'.Email & "  |  request " & Left(ThisItem.RequestID, 8)
+            Text: =ThisItem.RequestType.Value & "   " & Coalesce(ThisItem.Title, "") & Char(10) & "Item " & Coalesce(ThisItem.ItemID, "-") & " @ " & Coalesce(ThisItem.LocationCode, "-") & "   qty " & Coalesce(Text(ThisItem.Quantity), "-") & "   counted-from version " & Coalesce(Text(ThisItem.ExpectedVersion), "-") & Char(10) & Text(ThisItem.Created, "mmm d, h:mm AM/PM") & "  |  filed by account " & ThisItem.'Created By'.Email & "  |  request " & Left(ThisItem.RequestID, 8)
             Size: =13
             Color: =RGBA(32, 32, 32, 1)
             Fill: =RGBA(0, 0, 0, 0)
@@ -722,11 +719,11 @@ scrSupervisor As screen:
         Start: =true
         OnTimerEnd: |-
             =If(
-                locPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+                locPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
                 Select(btnFindSup)
             );
             If(
-                locLocPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+                locLocPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
                 Select(btnLocSup)
             )
         Fill: =RGBA(0, 0, 0, 0)
@@ -780,9 +777,7 @@ scrSupervisor As screen:
         Y: =234
         Width: =860
         Height: =100
-        Text: |-
-            =If(IsBlank(locSel), "", locSel.ItemName & "
-            " & locSel.ItemID & " @ " & locSel.LocationCode & "   on hand " & Coalesce(Text(locSel.OnHandQty), "-") & "   record version " & locSel.StockVersion & "   " & locSel.BalanceStatus.Value)
+        Text: =If(IsBlank(locSel), "", locSel.ItemName & Char(10) & locSel.ItemID & " @ " & locSel.LocationCode & "   on hand " & Coalesce(Text(locSel.OnHandQty), "-") & "   record version " & locSel.StockVersion & "   " & locSel.BalanceStatus.Value)
         Size: =16
         Color: =RGBA(32, 32, 32, 1)
         Fill: =RGBA(0, 0, 0, 0)

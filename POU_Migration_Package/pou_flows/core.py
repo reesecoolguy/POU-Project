@@ -1,6 +1,6 @@
 """The request-processing core shared by POU-ProcessRequest (instant) and POU-Sweeper (scheduled).
 
-DESIGN RULES (see docs/05_Posting_Design.md):
+DESIGN RULES (see docs/06_Consistency_Limits.md):
   1. A request is an instruction. Only a POULedger row in PostingState=Posted is a completed movement.
   2. Stock is never changed unless a ledger Intent row already exists for the request. So "no ledger row for this RequestID"
      (established by a successful query) is the ONLY basis for saying 'nothing was changed' (InventoryEffect=NotApplied).

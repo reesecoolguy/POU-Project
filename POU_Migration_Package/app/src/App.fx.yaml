@@ -3,7 +3,7 @@ App As appinfo:
     OnStart: |-
         =// 1. who/where: the Microsoft account running the app is NOT the employee
         Set(varStation, Upper(Trim(Coalesce(Param("StationID"), LookUp(POUStations, Active = true, ExpectedAccountUPN = Lower(User().Email)).StationID, ""))));
-        Set(varBuild, "POU-APP-d414ca54");
+        Set(varBuild, "POU-APP-bd33f6ed");
         Set(varRowLimit, 500);
         // 2. central settings (editable in POUSettings); defaults mirror schema/settings_defaults.json
         Set(varSettingsOk, false);

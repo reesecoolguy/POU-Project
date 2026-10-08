@@ -90,7 +90,7 @@ Navigate(scrSupervisor, ScreenTransition.None)"""
             note="Only appears when the Microsoft account running the app is an active Supervisor/Admin in POUEmployees. Authority is re-checked by the server from the request Author."),
         lbl("lblLoginFoot", '"Signed in to Microsoft as " & User().Email & "  |  app build " & varBuild & "  |  " & If(varSettingsOk, "settings loaded", "SETTINGS NOT LOADED - using defaults")',
             0, 730, 1366, 30, 12, False, "RGBA(200, 200, 200, 1)", align="Align.Center", note="Which Microsoft account the app is running as (this is NOT the employee)"),
-        tmr("tmrBadge", "150", "If(\n    locBadgePending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,\n    Select(btnLogin)\n)", note="Debounce for the badge scan"),
+        tmr("tmrBadge", "150", "If(\n    locBadgePending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,\n    Select(btnLogin)\n)", note="Debounce for the badge scan"),
         tmr("tmrLoginTick", "1000", "Set(varTick, Now())", note="Keeps the clock/idle variables moving"),
     ]
     return Screen("scrLogin", "Badge / session entry",
@@ -169,28 +169,28 @@ IfError(
     kids = header(p) + [runner(p, fin)] + picker(p, 80, on_select_extra=lambda e: f"locVer: {e}.StockVersion, locReview: false, locFresh: Blank()",
                               qty_ctl=f"txtCount{p}") + [
         lbl(f"lblAudName{p}", 'If(IsBlank(locSel), "", locSel.ItemName & "   |   " & locSel.ItemID & " @ " & locSel.LocationCode & "   (count started at record version " & locVer & ")")',
-            24, 400, 1300, 36, 20, True, note="What is being counted. The system quantity is deliberately hidden until the count is entered (blind count)."),
-        lbl(f"lblStep3{p}", '"3  Counted quantity (physical count, 0 or more)"', 24, 440, 600, 24, 14, True, GREY),
-        inp(f"txtCount{p}", "Counted quantity", 24, 466, 240, 60, onchange=F.ACT + ";\nUpdateContext({locReview: false, locFresh: Blank()})",
+            24, 430, 1300, 30, 18, True, note="What is being counted. The system quantity is deliberately hidden until the count is entered (blind count)."),
+        lbl(f"lblStep3{p}", '"3  Counted quantity (physical count, 0 or more)"', 24, 462, 600, 22, 14, True, GREY),
+        inp(f"txtCount{p}", "Counted quantity", 24, 486, 240, 56, onchange=F.ACT + ";\nUpdateContext({locReview: false, locFresh: Blank()})",
             display="If(And(IsBlank(varReq), Not(IsBlank(locSel))), DisplayMode.Edit, DisplayMode.Disabled)", size=30, tab=5,
             note="Whole number 0-999999."),
         lbl(f"lblCountHint{p}", f'If(IsBlank(txtCount{p}.Text), "", Not({count_ok}), "Counted quantity must be a whole number, 0 or more. Was a barcode scanned into this box?", "")',
-            280, 466, 820, 60, 14, True, "RGBA(156, 0, 6, 1)"),
-        btn(f"btnReview{p}", '"Review count"', review, 24, 540, 240, 60, display=f"If(And(IsBlank(varReq), Not(IsBlank(locSel)), {count_ok}), DisplayMode.Edit, DisplayMode.Disabled)",
+            280, 486, 820, 56, 14, True, "RGBA(156, 0, 6, 1)"),
+        btn(f"btnReview{p}", '"Review count"', review, 24, 552, 240, 56, display=f"If(And(IsBlank(varReq), Not(IsBlank(locSel)), {count_ok}), DisplayMode.Edit, DisplayMode.Disabled)",
             fill="RGBA(68, 114, 196, 1)", visible="IsBlank(varReq)", tab=6, note="Re-reads the record and shows the variance before anything is filed"),
         lbl(f"lblReview{p}", f'''If(
     Not(locReview) Or IsBlank(locFresh), "",
     {stale}, "STOCK MOVED while you were counting: the record changed from version " & locVer & " to " & locFresh.StockVersion & " (an ADD, REMOVE or other posting happened). RECOUNT.",
     IsBlank(locFresh.OnHandQty), "FIRST COUNT. Counted " & {cnt} & ". There is no previous balance; this count becomes the verified starting quantity.",
     "Counted " & {cnt} & "   |   System says " & locFresh.OnHandQty & "   |   Variance " & Text({var_expr}, "+0;-0;0")
-)''', 290, 540, 800, 92, 18, True, INK, fill=f"If({stale}, {RED}, {big}, {AMBER}, {BLUE})", visible="locReview", note="Result of the review"),
+)''', 290, 552, 800, 92, 16, True, INK, fill=f"If({stale}, {RED}, {big}, {AMBER}, {BLUE})", visible="locReview", note="Result of the review"),
         btn(f"btnRecount{p}", '"Recount"', act(f"Reset(txtCount{p});\nUpdateContext({{locReview: false, locFresh: Blank(), locVer: LookUp(POUStockLocations, StockKey = locSel.StockKey).StockVersion, locSel: LookUp(POUStockLocations, StockKey = locSel.StockKey)}});\nSetFocus(txtCount{p})"),
-            1110, 540, 200, 60, fill="RGBA(191, 144, 0, 1)", visible="locReview And IsBlank(varReq)", tab=8, note="Reloads the record and restarts the count from its current version"),
-        btn(f"btnPostCount{p}", f'If({big}, "Variance is " & Text({var_expr}, "+0;-0;0") & " - I recounted. POST COUNT", "POST COUNT")', post, 24, 650, 520, 60,
+            1110, 552, 200, 56, fill="RGBA(191, 144, 0, 1)", visible="locReview And IsBlank(varReq)", tab=8, note="Reloads the record and restarts the count from its current version"),
+        btn(f"btnPostCount{p}", f'If({big}, "Variance is " & Text({var_expr}, "+0;-0;0") & " - I recounted. POST COUNT", "POST COUNT")', post, 24, 650, 520, 56,
             display=f"If(And(locReview, Not({stale}), Not(varBusy)), DisplayMode.Edit, DisplayMode.Disabled)",
             fill=f"If({big}, RGBA(192, 80, 77, 1), RGBA(84, 130, 53, 1))", size=18, visible="IsBlank(varReq)", tab=7,
             note="Variance >= AuditConfirmVariance needs this explicit second confirmation. If a supervisor approval is required the request waits (nothing changes until approved)."),
-        btn(f"btnRetry{p}", '"Retry same request (" & Left(varReq.RequestID, 8) & ")"', act(f"Select(btnRun{p})"), 24, 650, 520, 60,
+        btn(f"btnRetry{p}", '"Retry same request (" & Left(varReq.RequestID, 8) & ")"', act(f"Select(btnRun{p})"), 24, 650, 520, 56,
             display="If(varBusy, DisplayMode.Disabled, DisplayMode.Edit)", fill="RGBA(191, 144, 0, 1)", visible="Not(IsBlank(varReq))", tab=7),
         tmr(f"tmrPoll{p}", "varPollSec * 1000", F.poll_tick(fin), start="varPolling And Not(IsBlank(varReq))"),
     ] + banner(p, 716 - 0)
@@ -229,9 +229,9 @@ SetFocus(txtItemId{p})""")
     row = lambda i: 150 + 62 * i
     kids = header(p) + [runner(p, fin)] + [
         lbl(f"lblAddHelp{p}", '"A NEW ITEM adds the item master AND its first stocking location. To stock an EXISTING item (e.g. K102516) in another place, choose ADD LOCATION: the item is never duplicated, merged or renumbered."',
-            24, 76, 1318, 50, 14, False, GREY),
-        btn(f"btnModeNew{p}", '"NEW ITEM"', act('UpdateContext({locMode: "ITEM_CREATE"})'), 24, 100, 200, 44, fill=f"If({new_mode}, RGBA(31, 56, 100, 1), RGBA(150, 150, 150, 1))", tab=1),
-        btn(f"btnModeLoc{p}", '"ADD LOCATION"', act('UpdateContext({locMode: "LOCATION_ADD"})'), 232, 100, 200, 44, fill=f"If({new_mode}, RGBA(150, 150, 150, 1), RGBA(31, 56, 100, 1))", tab=2),
+            24, 68, 1318, 44, 14, False, GREY),
+        btn(f"btnModeNew{p}", '"NEW ITEM"', act('UpdateContext({locMode: "ITEM_CREATE"})'), 24, 114, 200, 32, fill=f"If({new_mode}, RGBA(31, 56, 100, 1), RGBA(150, 150, 150, 1))", tab=1),
+        btn(f"btnModeLoc{p}", '"ADD LOCATION"', act('UpdateContext({locMode: "LOCATION_ADD"})'), 232, 114, 200, 32, fill=f"If({new_mode}, RGBA(150, 150, 150, 1), RGBA(31, 56, 100, 1))", tab=2),
         lbl(f"lblL1{p}", '"Item ID"', 24, row(0), 160, 40, 16, True), inp(f"txtItemId{p}", "Item ID (text; leading zeros kept)", 190, row(0) - 4, 380, 48, onchange=F.ACT, display=ADD_EDIT, tab=3),
         lbl(f"lblL2{p}", '"Name"', 24, row(1), 160, 40, 16, True, visible=new_mode), inp(f"txtName{p}", "Item name", 190, row(1) - 4, 700, 48, onchange=F.ACT, display=ADD_EDIT, visible=new_mode, tab=4),
         lbl(f"lblL3{p}", '"Manufacturer"', 24, row(2), 160, 40, 16, True, visible=new_mode), inp(f"txtMfr{p}", "Manufacturer (optional)", 190, row(2) - 4, 380, 48, onchange=F.ACT, display=ADD_EDIT, visible=new_mode, tab=5),
@@ -297,13 +297,13 @@ def scr_history() -> Screen:
     ledger = (f'If(IsBlank({item}), FirstN(SortByColumns(POULedger, "ID", SortOrder.Descending), 60), '
               f'FirstN(SortByColumns(Filter(POULedger, ItemID = {item}), "ID", SortOrder.Descending), 60))')
     kids = header(p) + [
-        lbl(f"lblReqTitle{p}", '"Requests from this station - with processing status"', 24, 76, 640, 28, 16, True),
+        lbl(f"lblReqTitle{p}", '"Requests from this station - with processing status"', 24, 76, 520, 28, 16, True),
         btn(f"btnRefresh{p}", '"Refresh"', act("Refresh(POURequests); Refresh(POULedger)"), 560, 72, 110, 34, fill="RGBA(68, 114, 196, 1)", size=12),
         Ctl(f"galReq{p}", "gallery.galleryVertical",
             {"X": 24, "Y": 110, "Width": 650, "Height": 600, "TemplateSize": 84,
              "Items": 'FirstN(SortByColumns(Filter(POURequests, StationID = varStation), "ID", SortOrder.Descending), 50)',
              "TemplateFill": f'Switch(ThisItem.RequestStatus.Value, "Succeeded", {GREEN}, "Rejected", {RED}, "Failed", {RED}, "AwaitingSupervisor", {AMBER}, "Pending", {AMBER}, "Processing", {AMBER}, {WHITE})'},
-            [lbl(f"lblReqRow{p}", 'ThisItem.RequestType.Value & "  " & Coalesce(ThisItem.Title, "") & "\n" & ThisItem.RequestStatus.Value & If(ThisItem.IsOpen, "  (open)", "") & "  -  " & Coalesce(ThisItem.ResultMessage, "") & "\n" & Text(ThisItem.Created, "mmm d, h:mm AM/PM") & "  |  request " & Left(ThisItem.RequestID, 8) & If(ThisItem.InventoryEffect.Value = "Unknown", "  |  EFFECT UNKNOWN - tell a supervisor", "")',
+            [lbl(f"lblReqRow{p}", 'ThisItem.RequestType.Value & "  " & Coalesce(ThisItem.Title, "") & Char(10) & ThisItem.RequestStatus.Value & If(ThisItem.IsOpen, "  (open)", "") & "  -  " & Coalesce(ThisItem.ResultMessage, "") & Char(10) & Text(ThisItem.Created, "mmm d, h:mm AM/PM") & "  |  request " & Left(ThisItem.RequestID, 8) & If(ThisItem.InventoryEffect.Value = "Unknown", "  |  EFFECT UNKNOWN - tell a supervisor", "")',
                  8, 4, 634, 76, 12, False),
              btn(f"btnReCheck{p}", '"Re-check"', act(f"IfError({F.PROCESS_FLOW}.Run(ThisItem.RequestID), true);\nRefresh(POURequests)"), 540, 50, 96, 28, fill="RGBA(191, 144, 0, 1)", size=11,
                  visible='ThisItem.IsOpen And ThisItem.RequestStatus.Value <> "AwaitingSupervisor"', note="Asks the flow to finish an unfinished request. Idempotent: it cannot post twice.")],
@@ -313,7 +313,7 @@ def scr_history() -> Screen:
         Ctl(f"galLed{p}", "gallery.galleryVertical",
             {"X": 690, "Y": 156, "Width": 660, "Height": 554, "TemplateSize": 66, "Items": ledger,
              "TemplateFill": f'If(ThisItem.Origin.Value = "Legacy", RGBA(237, 237, 237, 1), If(ThisItem.PostingState.Value = "Posted", {WHITE}, {AMBER}))'},
-            [lbl(f"lblLedRow{p}", 'ThisItem.LedgerType.Value & If(ThisItem.Origin.Value = "Legacy", " (LEGACY)", "") & " " & ThisItem.ItemID & " @ " & Coalesce(ThisItem.LocationCode, "?") & "  delta " & Coalesce(Text(ThisItem.QtyDelta), "-") & "  -> " & Coalesce(Text(ThisItem.QtyAfter), "-") & "\n" & Coalesce(ThisItem.EmployeeName, ThisItem.LegacyUser, "?") & "  |  " & Coalesce(ThisItem.OccurredLocalText, ThisItem.LegacyTimestampText, Text(ThisItem.OccurredUtc, "mmm d, h:mm AM/PM")) & If(ThisItem.PostingState.Value <> "Posted", "  |  " & ThisItem.PostingState.Value, "")',
+            [lbl(f"lblLedRow{p}", 'ThisItem.LedgerType.Value & If(ThisItem.Origin.Value = "Legacy", " (LEGACY)", "") & " " & ThisItem.ItemID & " @ " & Coalesce(ThisItem.LocationCode, "?") & "  delta " & Coalesce(Text(ThisItem.QtyDelta), "-") & "  -> " & Coalesce(Text(ThisItem.QtyAfter), "-") & Char(10) & Coalesce(ThisItem.EmployeeName, ThisItem.LegacyUser, "?") & "  |  " & Coalesce(ThisItem.OccurredLocalText, ThisItem.LegacyTimestampText, Text(ThisItem.OccurredUtc, "mmm d, h:mm AM/PM")) & If(ThisItem.PostingState.Value <> "Posted", "  |  " & ThisItem.PostingState.Value, "")',
                  8, 4, 644, 58, 12, False)],
             note="Delegable: Filter on indexed ItemID, SortByColumns on ID, FirstN"),
     ]
@@ -377,7 +377,7 @@ def scr_supervisor() -> Screen:
         Ctl(f"galQueue{p}", "gallery.galleryVertical",
             {"X": 24, "Y": 150, "Width": 1318, "Height": 500, "TemplateSize": 80, "Visible": tab("Q"),
              "Items": 'FirstN(SortByColumns(Filter(POURequests, IsOpen = true, RequestStatus.Value = "AwaitingSupervisor"), "ID", SortOrder.Ascending), 100)'},
-            [lbl(f"lblQRow{p}", 'ThisItem.RequestType.Value & "   " & Coalesce(ThisItem.Title, "") & "\n" & "Item " & Coalesce(ThisItem.ItemID, "-") & " @ " & Coalesce(ThisItem.LocationCode, "-") & "   qty " & Coalesce(Text(ThisItem.Quantity), "-") & "   counted-from version " & Coalesce(Text(ThisItem.ExpectedVersion), "-") & "\n" & Text(ThisItem.Created, "mmm d, h:mm AM/PM") & "  |  filed by account " & ThisItem.\'Created By\'.Email & "  |  request " & Left(ThisItem.RequestID, 8)',
+            [lbl(f"lblQRow{p}", 'ThisItem.RequestType.Value & "   " & Coalesce(ThisItem.Title, "") & Char(10) & "Item " & Coalesce(ThisItem.ItemID, "-") & " @ " & Coalesce(ThisItem.LocationCode, "-") & "   qty " & Coalesce(Text(ThisItem.Quantity), "-") & "   counted-from version " & Coalesce(Text(ThisItem.ExpectedVersion), "-") & Char(10) & Text(ThisItem.Created, "mmm d, h:mm AM/PM") & "  |  filed by account " & ThisItem.\'Created By\'.Email & "  |  request " & Left(ThisItem.RequestID, 8)',
                   8, 4, 940, 72, 13, False),
              btn(f"btnApprove{p}", '"APPROVE"', on("And(Not(varBusy), IsBlank(varReq), varSupMode)", approve_req("Approve")), 960, 18, 160, 44,
                  display=sup_edit, fill="RGBA(84, 130, 53, 1)",
@@ -386,7 +386,7 @@ def scr_supervisor() -> Screen:
                  display=sup_edit, fill="RGBA(192, 80, 77, 1)")],
             note="Delegable: Filter on Boolean IsOpen + choice .Value (confirm the delegation indicator in Studio) + SortByColumns on ID"),
     ] + picker_ctls + [
-        lbl(f"lblSupSel{p}", 'If(IsBlank(locSel), "", locSel.ItemName & "\n" & locSel.ItemID & " @ " & locSel.LocationCode & "   on hand " & Coalesce(Text(locSel.OnHandQty), "-") & "   record version " & locSel.StockVersion & "   " & locSel.BalanceStatus.Value)',
+        lbl(f"lblSupSel{p}", 'If(IsBlank(locSel), "", locSel.ItemName & Char(10) & locSel.ItemID & " @ " & locSel.LocationCode & "   on hand " & Coalesce(Text(locSel.OnHandQty), "-") & "   record version " & locSel.StockVersion & "   " & locSel.BalanceStatus.Value)',
             480, 234, 860, 100, 16, True, INK, visible=f'Not({tab("Q")})', note="Supervisors see the system quantity"),
         # ---------------- adjust / opening
         lbl(f"lblAdjHead{p}", '"ADJUSTMENT sets the quantity to the number you enter and records your reason. It is a new ledger entry, never an edit of history."', 24, 352, 1300, 28, 13, True, GREY, visible=tab("A")),
@@ -436,7 +436,7 @@ def scr_admin() -> Screen:
     p = "Admin"
     new_loc = F.normalise(f"txtNewLoc{p}.Text")
     kids = header(p) + [
-        lbl(f"lblAdmTitle{p}", '"Settings (central configuration). Changes are versioned in SharePoint; flows read them on every run."', 24, 76, 1300, 30, 16, True),
+        lbl(f"lblAdmTitle{p}", '"Settings (central configuration). Changes are versioned in SharePoint; flows read them on every run."', 24, 76, 900, 28, 15, True),
         lbl(f"lblAdmWho{p}", 'If(varRole = "Admin", "", "Read only - you are not an Admin. SharePoint would refuse your edits anyway.")', 24, 104, 800, 28, 13, True, RED),
         inp(f"txtSetFilter{p}", "Filter by name...", 24, 136, 300, 40, onchange=F.ACT, tab=1),
         Ctl(f"galSet{p}", "gallery.galleryVertical",

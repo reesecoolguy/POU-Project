@@ -52,5 +52,5 @@ def make_provider(args) -> Callable[[], str]:
     if getattr(args, "auth", "device") == "fake":
         return lambda: f"fake:{args.fake_user}"
     if not args.tenant or not args.client_id:
-        raise SystemExit("--tenant and --client-id are required for interactive sign-in (see docs/04_Deployment.md, step 'App registration').")
+        raise SystemExit("--tenant and --client-id are required for interactive sign-in (see docs/07_Deployment.md, step 'App registration').")
     return device_code_provider(args.tenant, args.client_id, args.site_url, getattr(args, "token_cache", None))

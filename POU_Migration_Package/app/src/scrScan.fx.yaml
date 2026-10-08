@@ -42,7 +42,7 @@ scrScan As screen:
         Y: =4
         Width: =200
         Height: =24
-        Text: ="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+        Text: ="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, TimeUnit.Seconds)) & " s"
         Size: =12
         Color: =RGBA(255, 255, 255, 1)
         Fill: =RGBA(0, 0, 0, 0)
@@ -88,7 +88,7 @@ scrScan As screen:
         OnTimerEnd: |-
             =Set(varTick, Now());
             If(
-                (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+                (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, TimeUnit.Seconds) >= varIdleMin * 60,
                 If(
                     Not(IsBlank(varSession)),
                     IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
@@ -252,8 +252,8 @@ scrScan As screen:
                 IsBlank(varReq) Or varBusy,
                 false,
                 Set(varBusy, true);
-            Set(varOutKind, "");
-            Set(varOutText, "");
+            Set(varOutKind, "wait");
+            Set(varOutText, "Posting... please wait. Do not press anything; this takes several seconds.");
             Set(varLookupFailed, false);
             Set(varFound, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Set(varLookupFailed, true); Blank()));
             Set(varSent, Not(IsBlank(varFound)));
@@ -538,11 +538,11 @@ scrScan As screen:
         Start: =true
         OnTimerEnd: |-
             =If(
-                locPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+                locPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
                 Select(btnFindScan)
             );
             If(
-                locLocPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+                locLocPending And DateDiff(locLastKey, Now(), TimeUnit.Milliseconds) >= varScanIdle,
                 Select(btnLocScan)
             )
         Fill: =RGBA(0, 0, 0, 0)

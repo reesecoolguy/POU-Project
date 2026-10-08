@@ -41,7 +41,7 @@ scrAdmin As screen:
         Y: =4
         Width: =200
         Height: =24
-        Text: ="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+        Text: ="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, TimeUnit.Seconds)) & " s"
         Size: =12
         Color: =RGBA(255, 255, 255, 1)
         Fill: =RGBA(0, 0, 0, 0)
@@ -87,7 +87,7 @@ scrAdmin As screen:
         OnTimerEnd: |-
             =Set(varTick, Now());
             If(
-                (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+                (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, TimeUnit.Seconds) >= varIdleMin * 60,
                 If(
                     Not(IsBlank(varSession)),
                     IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
@@ -240,10 +240,10 @@ scrAdmin As screen:
     lblAdmTitleAdmin As label:
         X: =24
         Y: =76
-        Width: =1300
-        Height: =30
+        Width: =900
+        Height: =28
         Text: ="Settings (central configuration). Changes are versioned in SharePoint; flows read them on every run."
-        Size: =16
+        Size: =15
         Color: =RGBA(32, 32, 32, 1)
         Fill: =RGBA(0, 0, 0, 0)
         Align: =Align.Left

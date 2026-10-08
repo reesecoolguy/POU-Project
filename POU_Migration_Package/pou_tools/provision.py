@@ -7,7 +7,7 @@
   is only reported as DRIFT. Data is never deleted or overwritten. Settings values are never overwritten.
 * NO CREDENTIALS are read or stored. Run as a SharePoint site owner / admin.
 
-Usage (see docs/04_Deployment.md for the full walkthrough):
+Usage (see docs/07_Deployment.md for the full walkthrough):
   python -m pou_tools.provision --site-url https://TENANT.sharepoint.com/sites/POU --tenant TENANT.onmicrosoft.com --client-id <APP-ID>
   python -m pou_tools.provision ... --apply
 """

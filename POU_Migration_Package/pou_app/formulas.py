@@ -146,8 +146,8 @@ def run_post(after_final: str) -> str:
     IsBlank(varReq) Or varBusy,
     false,
     Set(varBusy, true);
-Set(varOutKind, "");
-Set(varOutText, "");
+Set(varOutKind, "wait");
+Set(varOutText, "Posting... please wait. Do not press anything; this takes several seconds.");
 Set(varLookupFailed, false);
 Set(varFound, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Set(varLookupFailed, true); Blank()));
 Set(varSent, Not(IsBlank(varFound)));

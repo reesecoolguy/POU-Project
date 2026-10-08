@@ -2,6 +2,7 @@
 
 Hourly tick; once per week. For every active stock record: units ISSUED in the last 30 and 90 days, from the ledger.
 
+- **Flow name** (type it EXACTLY; the app refers to the two app-triggered flows by name): `POU-WeeklyUsage`
 - **Trigger**: Recurrence 1 h (tick) - Weekly on WeeklyDayOfWeek / WeeklyHourLocal
 - **Actions** (all levels): 44
 - **Connections**: SharePoint (`shared_sharepointonline`) as the flow service account, Office 365 Outlook (`shared_office365`)
