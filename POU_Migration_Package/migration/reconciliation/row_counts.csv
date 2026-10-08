@@ -1,0 +1,13 @@
+Check,Source,Target,Difference,Status,Note
+Inventory rows -> stock-location records (+ held),254,254,0,OK,254 imported + 0 held in exceptions
+Distinct Item IDs -> item master rows (+ ids wholly held),251,251,0,OK,
+Stock records with a numeric On Hand -> OPENING requests,252,252,0,OK,
+Stock records with blank/invalid On Hand -> NoBalance (no opening request),2,2,0,OK,
+Sum of source On Hand (imported rows) -> sum of OPENING quantities,973,973,0,OK,
+Sum of source On Hand (all rows) -> imported rows + held rows,973,973,0,OK,
+Users rows -> employees (+ held),7,7,0,OK,
+Transactions rows -> legacy ledger rows (+ held),13,13,0,OK,
+InventoryAudit rows -> legacy ledger rows (+ held),13,13,0,OK,
+Locations: distinct normalised locations -> locations,22,22,0,OK,
+Duplicate StockKeys in import file,0,0,0,OK,
+Duplicate LedgerKeys in legacy ledger,0,0,0,OK,

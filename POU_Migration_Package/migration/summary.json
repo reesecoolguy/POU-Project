@@ -1,0 +1,23 @@
+{
+  "source_file": "POU_Inventory_Pilot Test _With_Badge.xlsm",
+  "source_sha256": "b46a6239b64183ed7fad9c1f44123dea10e2f78a70fba70a7e0004f1dfd1397e",
+  "inventory_rows": 254,
+  "stock_records_imported": 254,
+  "stock_records_held": 0,
+  "items": 251,
+  "locations": 22,
+  "items_with_multiple_locations": 3,
+  "opening_requests": 252,
+  "blank_or_invalid_onhand": 2,
+  "sum_opening_quantity": 973,
+  "employees": 7,
+  "legacy_ledger_rows": 26,
+  "legacy_rows_held": 0,
+  "exceptions": {
+    "WARN": 33,
+    "INFO": 46
+  },
+  "low_stock_le_min": 71,
+  "low_stock_lt_min": 9,
+  "source_timezone_assumed": "America/Chicago"
+}

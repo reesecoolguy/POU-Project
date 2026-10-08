@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.tmp
+.venv/
+POU_Migration_Package/**/token_cache*.json

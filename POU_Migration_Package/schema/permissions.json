@@ -1,0 +1,139 @@
+{
+  "schemaVersion": "1.0.0",
+  "notes": [
+    "SharePoint permissions are the only real access control in this design. Hidden screens, disabled buttons and Visible properties in the app are convenience only.",
+    "Every list below breaks permission inheritance and is given exactly these assignments. 'NONE' means the group has no assignment on the list (the list is invisible and unreadable to them).",
+    "POU Flow Service is the SharePoint group that holds the dedicated service account used by the flow connections. It is the ONLY principal with write access to POUStockLocations and POULedger.",
+    "The site Owners group keeps Full Control as break-glass. Its use bypasses the posting protocol and is detected by the nightly reconciliation."
+  ],
+  "groups": [
+    {
+      "key": "operators",
+      "title": "POU Operators",
+      "description": "Microsoft accounts that run the cabinet app (station accounts or named operators). Read inventory; can only ADD rows to POURequests."
+    },
+    {
+      "key": "supervisors",
+      "title": "POU Supervisors",
+      "description": "Named supervisors. Authenticated by their own Microsoft sign-in. Can ADD requests (incl. APPROVE) from their own device."
+    },
+    {
+      "key": "admins",
+      "title": "POU Admins",
+      "description": "Edit configuration and item master data. Cannot write stock or ledger."
+    },
+    {
+      "key": "flowservice",
+      "title": "POU Flow Service",
+      "description": "Dedicated service account(s) that own the Power Automate connections."
+    }
+  ],
+  "roleDefinitions": [
+    {
+      "key": "read",
+      "name": "Read",
+      "builtin": true
+    },
+    {
+      "key": "contribute",
+      "name": "Contribute",
+      "builtin": true
+    },
+    {
+      "key": "addonly",
+      "name": "POU Add Only",
+      "builtin": false,
+      "description": "Read + Add Items. No edit, no delete.",
+      "base": "Read",
+      "add": [
+        "AddListItems"
+      ]
+    },
+    {
+      "key": "flowwriter",
+      "name": "POU Flow Writer",
+      "builtin": false,
+      "description": "Read + Add + Edit Items. No delete.",
+      "base": "Read",
+      "add": [
+        "AddListItems",
+        "EditListItems"
+      ]
+    }
+  ],
+  "ownersGroupRole": "Full Control",
+  "matrix": {
+    "POUSettings": {
+      "operators": "read",
+      "supervisors": "read",
+      "admins": "contribute",
+      "flowservice": "read"
+    },
+    "POUStations": {
+      "operators": "read",
+      "supervisors": "read",
+      "admins": "contribute",
+      "flowservice": "read"
+    },
+    "POULocations": {
+      "operators": "read",
+      "supervisors": "read",
+      "admins": "contribute",
+      "flowservice": "read"
+    },
+    "POUEmployees": {
+      "operators": null,
+      "supervisors": "read",
+      "admins": "contribute",
+      "flowservice": "read"
+    },
+    "POUSessions": {
+      "operators": null,
+      "supervisors": null,
+      "admins": "read",
+      "flowservice": "contribute"
+    },
+    "POUItems": {
+      "operators": "read",
+      "supervisors": "read",
+      "admins": "contribute",
+      "flowservice": "flowwriter"
+    },
+    "POUStockLocations": {
+      "operators": "read",
+      "supervisors": "read",
+      "admins": "read",
+      "flowservice": "flowwriter"
+    },
+    "POURequests": {
+      "operators": "addonly",
+      "supervisors": "addonly",
+      "admins": "read",
+      "flowservice": "contribute"
+    },
+    "POULedger": {
+      "operators": "read",
+      "supervisors": "read",
+      "admins": "read",
+      "flowservice": "flowwriter"
+    },
+    "POUOpsEvents": {
+      "operators": null,
+      "supervisors": "read",
+      "admins": "contribute",
+      "flowservice": "contribute"
+    }
+  },
+  "listSettings": {
+    "_default": {
+      "enableVersioning": true,
+      "majorVersionLimit": 500
+    },
+    "POUSessions": {
+      "enableVersioning": false
+    },
+    "POUOpsEvents": {
+      "enableVersioning": false
+    }
+  }
+}

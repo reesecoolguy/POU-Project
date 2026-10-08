@@ -1,0 +1,249 @@
+{
+  "settings": [
+    {
+      "SettingKey": "LowStockRule",
+      "SettingValue": "LE",
+      "ValueType": "Text",
+      "Description": "Low stock when OnHand <= MinQty (LE) or OnHand < MinQty (LT). The workbook used both: the scanner warned at <= and the Low Stock list used <. Default LE as in the code pack.",
+      "Title": "LowStockRule"
+    },
+    {
+      "SettingKey": "IdleTimeoutMinutes",
+      "SettingValue": "3",
+      "ValueType": "Number",
+      "Description": "Client-side idle timeout of a badge session (minutes). Code-pack default 3; the original workbook used 15.",
+      "Title": "IdleTimeoutMinutes"
+    },
+    {
+      "SettingKey": "ServerSessionMaxIdleMinutes",
+      "SettingValue": "10",
+      "ValueType": "Number",
+      "Description": "Server-side backstop: a request is rejected if the session saw no accepted request for this long. Must be >= IdleTimeoutMinutes.",
+      "Title": "ServerSessionMaxIdleMinutes"
+    },
+    {
+      "SettingKey": "LogoutAfterSubmit",
+      "SettingValue": "false",
+      "ValueType": "Boolean",
+      "Description": "If true the app ends the session after every successful submission.",
+      "Title": "LogoutAfterSubmit"
+    },
+    {
+      "SettingKey": "MaxAddQty",
+      "SettingValue": "500",
+      "ValueType": "Number",
+      "Description": "Largest single RECEIPT (ADD) quantity. Enforced in the app AND by the processor.",
+      "Title": "MaxAddQty"
+    },
+    {
+      "SettingKey": "AuditConfirmVariance",
+      "SettingValue": "5",
+      "ValueType": "Number",
+      "Description": "Absolute audit variance at or above this asks for explicit confirmation.",
+      "Title": "AuditConfirmVariance"
+    },
+    {
+      "SettingKey": "RequireSupervisorForAudit",
+      "SettingValue": "true",
+      "ValueType": "Boolean",
+      "Description": "AUDIT requests need supervisor authority (authenticated Microsoft account).",
+      "Title": "RequireSupervisorForAudit"
+    },
+    {
+      "SettingKey": "RequireSupervisorForNewItem",
+      "SettingValue": "true",
+      "ValueType": "Boolean",
+      "Description": "ITEM_CREATE / LOCATION_ADD need supervisor authority.",
+      "Title": "RequireSupervisorForNewItem"
+    },
+    {
+      "SettingKey": "AllowIssueAgainstUnverified",
+      "SettingValue": "true",
+      "ValueType": "Boolean",
+      "Description": "If false, ISSUE/RECEIPT are refused until the opening balance is Verified by a count.",
+      "Title": "AllowIssueAgainstUnverified"
+    },
+    {
+      "SettingKey": "DisplayTimeZoneIana",
+      "SettingValue": "America/Chicago",
+      "ValueType": "Text",
+      "Description": "Display/scheduling zone (IANA). Storage is always UTC.",
+      "Title": "DisplayTimeZoneIana"
+    },
+    {
+      "SettingKey": "DisplayTimeZoneWindows",
+      "SettingValue": "Central Standard Time",
+      "ValueType": "Text",
+      "Description": "Same zone as a Windows ID: Power Automate time-zone functions need this form.",
+      "Title": "DisplayTimeZoneWindows"
+    },
+    {
+      "SettingKey": "StaleClaimSeconds",
+      "SettingValue": "120",
+      "ValueType": "Number",
+      "Description": "A request in Processing longer than this may be taken over by the sweeper.",
+      "Title": "StaleClaimSeconds"
+    },
+    {
+      "SettingKey": "StaleIntentMinutes",
+      "SettingValue": "5",
+      "ValueType": "Number",
+      "Description": "A ledger Intent older than this is resolved by the sweeper (applied, completed or voided).",
+      "Title": "StaleIntentMinutes"
+    },
+    {
+      "SettingKey": "MaxProcessAttempts",
+      "SettingValue": "5",
+      "ValueType": "Number",
+      "Description": "After this many attempts a request with NO ledger intent is marked Failed/NotApplied.",
+      "Title": "MaxProcessAttempts"
+    },
+    {
+      "SettingKey": "ApprovalExpiryHours",
+      "SettingValue": "24",
+      "ValueType": "Number",
+      "Description": "Requests waiting for a supervisor longer than this are Rejected (EXPIRED).",
+      "Title": "ApprovalExpiryHours"
+    },
+    {
+      "SettingKey": "RequestRetentionDays",
+      "SettingValue": "90",
+      "ValueType": "Number",
+      "Description": "Terminal requests older than this are deleted weekly. Ledger rows are never deleted.",
+      "Title": "RequestRetentionDays"
+    },
+    {
+      "SettingKey": "SessionRetentionDays",
+      "SettingValue": "30",
+      "ValueType": "Number",
+      "Description": "Ended/expired sessions older than this are deleted weekly.",
+      "Title": "SessionRetentionDays"
+    },
+    {
+      "SettingKey": "UsageWindowsDays",
+      "SettingValue": "30,90",
+      "ValueType": "Text",
+      "Description": "Usage report windows in days.",
+      "Title": "UsageWindowsDays"
+    },
+    {
+      "SettingKey": "UsageIncludeLegacy",
+      "SettingValue": "true",
+      "ValueType": "Boolean",
+      "Description": "Include legacy (workbook) issues in usage when their stock record is known.",
+      "Title": "UsageIncludeLegacy"
+    },
+    {
+      "SettingKey": "ReportRecipientsLowStock",
+      "SettingValue": "CHANGE-ME@yourcompany.example",
+      "ValueType": "EmailList",
+      "Description": "Semicolon-separated. Flows refuse to send while this still contains CHANGE-ME.",
+      "Title": "ReportRecipientsLowStock"
+    },
+    {
+      "SettingKey": "ReportRecipientsUsage",
+      "SettingValue": "CHANGE-ME@yourcompany.example",
+      "ValueType": "EmailList",
+      "Description": "Weekly usage report recipients.",
+      "Title": "ReportRecipientsUsage"
+    },
+    {
+      "SettingKey": "ReportRecipientsDataHealth",
+      "SettingValue": "CHANGE-ME@yourcompany.example",
+      "ValueType": "EmailList",
+      "Description": "Weekly data-health and reconciliation recipients.",
+      "Title": "ReportRecipientsDataHealth"
+    },
+    {
+      "SettingKey": "ReportRecipientsOps",
+      "SettingValue": "CHANGE-ME@yourcompany.example",
+      "ValueType": "EmailList",
+      "Description": "Failed / stuck request alerts.",
+      "Title": "ReportRecipientsOps"
+    },
+    {
+      "SettingKey": "LowStockReportHourLocal",
+      "SettingValue": "7",
+      "ValueType": "Hour",
+      "Description": "Local hour (0-23, display zone) at which the daily low-stock report is sent. Flow ticks hourly and checks this.",
+      "Title": "LowStockReportHourLocal"
+    },
+    {
+      "SettingKey": "ReconcileHourLocal",
+      "SettingValue": "2",
+      "ValueType": "Hour",
+      "Description": "Local hour for the nightly balance-to-ledger reconciliation.",
+      "Title": "ReconcileHourLocal"
+    },
+    {
+      "SettingKey": "WeeklyDayOfWeek",
+      "SettingValue": "Monday",
+      "ValueType": "Text",
+      "Description": "Day for weekly data-health and usage reports.",
+      "Title": "WeeklyDayOfWeek"
+    },
+    {
+      "SettingKey": "WeeklyHourLocal",
+      "SettingValue": "6",
+      "ValueType": "Hour",
+      "Description": "Local hour for weekly reports.",
+      "Title": "WeeklyHourLocal"
+    },
+    {
+      "SettingKey": "LastLowStockReportDate",
+      "SettingValue": "",
+      "ValueType": "Text",
+      "Description": "Flow state (yyyy-MM-dd). Do not edit.",
+      "Title": "LastLowStockReportDate"
+    },
+    {
+      "SettingKey": "LastReconcileDate",
+      "SettingValue": "",
+      "ValueType": "Text",
+      "Description": "Flow state (yyyy-MM-dd). Do not edit.",
+      "Title": "LastReconcileDate"
+    },
+    {
+      "SettingKey": "LastWeeklyHealthDate",
+      "SettingValue": "",
+      "ValueType": "Text",
+      "Description": "Flow state (yyyy-MM-dd). Do not edit.",
+      "Title": "LastWeeklyHealthDate"
+    },
+    {
+      "SettingKey": "LastWeeklyUsageDate",
+      "SettingValue": "",
+      "ValueType": "Text",
+      "Description": "Flow state (yyyy-MM-dd). Do not edit.",
+      "Title": "LastWeeklyUsageDate"
+    },
+    {
+      "SettingKey": "ScanCommitIdleMs",
+      "SettingValue": "350",
+      "ValueType": "Number",
+      "Description": "App: milliseconds of no typing after which scanner text is treated as a complete scan (covers scanners with no/Enter/Tab suffix).",
+      "Title": "ScanCommitIdleMs"
+    },
+    {
+      "SettingKey": "ScanMinLength",
+      "SettingValue": "3",
+      "ValueType": "Number",
+      "Description": "App: scans shorter than this are ignored as noise.",
+      "Title": "ScanMinLength"
+    },
+    {
+      "SettingKey": "StatusPollSeconds",
+      "SettingValue": "2",
+      "ValueType": "Number",
+      "Description": "App: seconds between status polls while a request is unresolved.",
+      "Title": "StatusPollSeconds"
+    },
+    {
+      "SettingKey": "StatusPollTimeoutSeconds",
+      "SettingValue": "45",
+      "ValueType": "Number",
+      "Description": "App: after this long the screen says 'still processing' instead of waiting.",
+      "Title": "StatusPollTimeoutSeconds"
+    }
+  ]
+}

@@ -1,0 +1,209 @@
+{
+  "schemaVersion": "1.0.0",
+  "conventions": {
+    "listNames": "No spaces or underscores in list names: the REST entity type of a list with an underscore is encoded as _x005f_ and breaks hand-written flow calls.",
+    "internalNames": "PascalCase, <= 32 chars, never start with an underscore, never reuse SharePoint reserved names (ID, Title, Created, Modified, Author, Editor, Version, Type, Status). Created via SchemaXml so internal name == Name below.",
+    "title": "Every list keeps the built-in Title column but it is made non-required and holds a human-readable label written by flows (for example 'K100593 @ 1-A'). No logic reads Title.",
+    "stockKey": "StockKey = UPPER(TRIM(ItemID)) + '|' + UPPER(TRIM(LocationCode)). '|' is forbidden inside ItemID and LocationCode.",
+    "ledgerKey": "LedgerKey = StockKey + '#' + SeqNo for live rows; 'LEGACY|<sheet>|r<row>' for legacy rows.",
+    "timestamps": "All DateTime columns store UTC. *Local text columns store America/Chicago text for display so every device shows the same time.",
+    "indexLimit": "SharePoint Online allows 20 indexed columns per list; the largest list here uses 10."
+  },
+  "lists": [
+    {
+      "name": "POUSettings",
+      "description": "Central configuration. One row per setting. Read by app and flows; edited only by POU Admins.",
+      "titleLabel": "Label",
+      "growth": "tens of rows",
+      "fields": [
+        {"name": "SettingKey", "display": "Setting Key", "type": "Text", "maxLength": 100, "required": true, "unique": true, "indexed": true, "description": "Stable key used by the app and flows."},
+        {"name": "SettingValue", "display": "Setting Value", "type": "Text", "maxLength": 255, "description": "Value as text. Must not contain double quotes or backslashes (flows build a JSON object from these rows)."},
+        {"name": "ValueType", "display": "Value Type", "type": "Choice", "choices": ["Text", "Number", "Boolean", "EmailList", "Hour"], "default": "Text", "description": "Documentation and validation hint."},
+        {"name": "Description", "display": "Description", "type": "Note", "description": "What the setting does."}
+      ]
+    },
+    {
+      "name": "POUStations",
+      "description": "Cabinet stations. StationID is passed to the app in the launch URL (?StationID=CAB-01). Editable by Admins without touching the app.",
+      "titleLabel": "Label",
+      "growth": "tens of rows",
+      "fields": [
+        {"name": "StationID", "display": "Station ID", "type": "Text", "maxLength": 50, "required": true, "unique": true, "indexed": true},
+        {"name": "StationName", "display": "Station Name", "type": "Text", "maxLength": 255},
+        {"name": "Active", "display": "Active", "type": "Boolean", "default": true},
+        {"name": "ExpectedAccountUPN", "display": "Expected Account UPN", "type": "Text", "maxLength": 255, "description": "Optional. If set, requests from this station must be authored by this Microsoft account."},
+        {"name": "Notes", "display": "Notes", "type": "Note"}
+      ]
+    },
+    {
+      "name": "POULocations",
+      "description": "Known stocking locations (bin / shelf codes). New stock locations must reference an active row here.",
+      "titleLabel": "Label",
+      "growth": "tens of rows",
+      "fields": [
+        {"name": "LocationCode", "display": "Location Code", "type": "Text", "maxLength": 50, "required": true, "unique": true, "indexed": true},
+        {"name": "Description", "display": "Description", "type": "Text", "maxLength": 255},
+        {"name": "Active", "display": "Active", "type": "Boolean", "default": true}
+      ]
+    },
+    {
+      "name": "POUEmployees",
+      "description": "Badge holders. BadgeID is identification only. Role/MicrosoftUPN decide who may approve (via their own Microsoft sign-in), never the badge.",
+      "titleLabel": "Label",
+      "growth": "tens to hundreds of rows",
+      "fields": [
+        {"name": "BadgeID", "display": "Badge ID", "type": "Text", "maxLength": 50, "required": true, "unique": true, "indexed": true, "description": "TEXT. Leading zeros preserved."},
+        {"name": "EmployeeName", "display": "Employee Name", "type": "Text", "maxLength": 255, "required": true},
+        {"name": "Active", "display": "Active", "type": "Boolean", "default": true},
+        {"name": "Role", "display": "Role", "type": "Choice", "choices": ["Operator", "Supervisor", "Admin"], "default": "Operator"},
+        {"name": "MicrosoftUPN", "display": "Microsoft UPN", "type": "Text", "maxLength": 255, "indexed": true, "description": "Entra sign-in name. Required for Supervisor/Admin approval authority. Matched case-insensitively against the authenticated author of a request."},
+        {"name": "Notes", "display": "Notes", "type": "Note"}
+      ]
+    },
+    {
+      "name": "POUSessions",
+      "description": "Badge sessions created by the POU-Session flow. Never readable by operators.",
+      "titleLabel": "Label",
+      "growth": "hundreds per month (purged by weekly health flow)",
+      "fields": [
+        {"name": "SessionID", "display": "Session ID", "type": "Text", "maxLength": 64, "required": true, "unique": true, "indexed": true},
+        {"name": "BadgeID", "display": "Badge ID", "type": "Text", "maxLength": 50, "indexed": true},
+        {"name": "EmployeeName", "display": "Employee Name", "type": "Text", "maxLength": 255},
+        {"name": "StationID", "display": "Station ID", "type": "Text", "maxLength": 50},
+        {"name": "AppAccountUPN", "display": "App Account UPN", "type": "Text", "maxLength": 255, "description": "Microsoft account that was running the app. Requests in this session must be authored by it."},
+        {"name": "StartedUtc", "display": "Started (UTC)", "type": "DateTime"},
+        {"name": "LastActivityUtc", "display": "Last Activity (UTC)", "type": "DateTime"},
+        {"name": "SessionState", "display": "Session State", "type": "Choice", "choices": ["Active", "Ended", "Expired"], "default": "Active", "indexed": true},
+        {"name": "EndedReason", "display": "Ended Reason", "type": "Text", "maxLength": 100}
+      ]
+    },
+    {
+      "name": "POUItems",
+      "description": "Item master: one row per ItemID (part), regardless of how many locations stock it.",
+      "titleLabel": "Label",
+      "growth": "hundreds to low thousands",
+      "fields": [
+        {"name": "ItemID", "display": "Item ID", "type": "Text", "maxLength": 100, "required": true, "unique": true, "indexed": true, "description": "TEXT. Upper-case, trimmed. Never numeric."},
+        {"name": "ItemName", "display": "Item Name", "type": "Text", "maxLength": 255, "required": true},
+        {"name": "Description", "display": "Description", "type": "Note"},
+        {"name": "Manufacturer", "display": "Manufacturer", "type": "Text", "maxLength": 255},
+        {"name": "Priority", "display": "Priority", "type": "Number", "decimals": 0, "min": 1, "max": 99},
+        {"name": "LeadTimeDays", "display": "Lead Time (days)", "type": "Number", "decimals": 0, "min": 0, "max": 3650},
+        {"name": "UnitCost", "display": "Unit Cost", "type": "Currency", "decimals": 2, "min": 0},
+        {"name": "Notes", "display": "Notes", "type": "Note"},
+        {"name": "Active", "display": "Active", "type": "Boolean", "default": true},
+        {"name": "LegacySourceRows", "display": "Legacy Source Rows", "type": "Text", "maxLength": 255, "description": "Provenance: Inventory sheet rows this item was built from."},
+        {"name": "CreatedViaRequestID", "display": "Created Via Request", "type": "Text", "maxLength": 64},
+        {"name": "ApprovedByUPN", "display": "Approved By UPN", "type": "Text", "maxLength": 255}
+      ]
+    },
+    {
+      "name": "POUStockLocations",
+      "description": "Item/location stock record: one row per ItemID at one LocationCode. OnHandQty is written ONLY by POU-ProcessRequest / POU-Sweeper.",
+      "titleLabel": "Label",
+      "growth": "hundreds to low thousands",
+      "fields": [
+        {"name": "StockKey", "display": "Stock Key", "type": "Text", "maxLength": 200, "required": true, "unique": true, "indexed": true},
+        {"name": "ItemID", "display": "Item ID", "type": "Text", "maxLength": 100, "required": true, "indexed": true},
+        {"name": "LocationCode", "display": "Location Code", "type": "Text", "maxLength": 50, "required": true, "indexed": true},
+        {"name": "ItemName", "display": "Item Name", "type": "Text", "maxLength": 255, "description": "Denormalised copy of POUItems.ItemName for list display; repaired weekly."},
+        {"name": "Area", "display": "Area", "type": "Text", "maxLength": 255},
+        {"name": "MinQty", "display": "Min Qty", "type": "Number", "decimals": 0, "min": 0},
+        {"name": "MaxQty", "display": "Max Qty", "type": "Number", "decimals": 0, "min": 0},
+        {"name": "OnHandQty", "display": "On Hand Qty", "type": "Number", "decimals": 0, "min": 0, "description": "BLANK means no verified balance. Never 0 by default."},
+        {"name": "StockVersion", "display": "Stock Version", "type": "Number", "decimals": 0, "min": 0, "default": 0, "description": "Equals the SeqNo of the last applied ledger row for this StockKey."},
+        {"name": "BalanceStatus", "display": "Balance Status", "type": "Choice", "choices": ["NoBalance", "Unverified", "Verified"], "default": "NoBalance", "indexed": true},
+        {"name": "LowStockFlag", "display": "Low Stock Flag", "type": "Boolean", "default": false, "indexed": true, "description": "Stored (not calculated) so Power Apps can filter on it with delegation. Recomputed by posting and nightly."},
+        {"name": "Active", "display": "Active", "type": "Boolean", "default": true, "indexed": true},
+        {"name": "LastLedgerKey", "display": "Last Ledger Key", "type": "Text", "maxLength": 255},
+        {"name": "LastPostedUtc", "display": "Last Posted (UTC)", "type": "DateTime"},
+        {"name": "LastCountedUtc", "display": "Last Counted (UTC)", "type": "DateTime"},
+        {"name": "LegacySourceRow", "display": "Legacy Source Row", "type": "Text", "maxLength": 100}
+      ]
+    },
+    {
+      "name": "POURequests",
+      "description": "Request queue. Operators and supervisors can only ADD rows. A request is an instruction, not a completed movement.",
+      "titleLabel": "Label",
+      "growth": "hundreds per week (purged after RequestRetentionDays)",
+      "fields": [
+        {"name": "RequestID", "display": "Request ID", "type": "Text", "maxLength": 64, "required": true, "unique": true, "indexed": true, "description": "Client-generated GUID kept across retries. Duplicate-request protection."},
+        {"name": "RequestType", "display": "Request Type", "type": "Choice", "choices": ["ISSUE", "RECEIPT", "AUDIT", "OPENING", "ADJUSTMENT", "REVERSAL", "ITEM_CREATE", "LOCATION_ADD", "PARAM_UPDATE", "APPROVE"], "required": true, "indexed": true},
+        {"name": "RequestStatus", "display": "Request Status", "type": "Choice", "choices": ["Pending", "Processing", "AwaitingSupervisor", "Succeeded", "Rejected", "Failed"], "default": "Pending", "indexed": true},
+        {"name": "IsOpen", "display": "Is Open", "type": "Boolean", "default": true, "indexed": true, "description": "Yes until a flow marks the request terminal. Lets the app list unresolved requests with one delegable filter."},
+        {"name": "SessionID", "display": "Session ID", "type": "Text", "maxLength": 64},
+        {"name": "StationID", "display": "Station ID", "type": "Text", "maxLength": 50, "indexed": true},
+        {"name": "StockKey", "display": "Stock Key", "type": "Text", "maxLength": 200, "indexed": true},
+        {"name": "ItemID", "display": "Item ID", "type": "Text", "maxLength": 100},
+        {"name": "LocationCode", "display": "Location Code", "type": "Text", "maxLength": 50},
+        {"name": "Quantity", "display": "Quantity", "type": "Number", "decimals": 0, "min": 0, "description": "ISSUE/RECEIPT: units. AUDIT/OPENING: counted/opening quantity. ADJUSTMENT: new absolute quantity."},
+        {"name": "ExpectedVersion", "display": "Expected Version", "type": "Number", "decimals": 0, "min": 0, "description": "StockVersion the client saw when the count began (AUDIT stale detection)."},
+        {"name": "PayloadJson", "display": "Payload JSON", "type": "Note", "description": "ITEM_CREATE / LOCATION_ADD / PARAM_UPDATE fields as JSON."},
+        {"name": "Reason", "display": "Reason", "type": "Text", "maxLength": 255},
+        {"name": "ReversesLedgerKey", "display": "Reverses Ledger Key", "type": "Text", "maxLength": 255},
+        {"name": "TargetRequestID", "display": "Target Request ID", "type": "Text", "maxLength": 64, "indexed": true, "description": "APPROVE: request being approved or rejected."},
+        {"name": "Decision", "display": "Decision", "type": "Choice", "choices": ["Approve", "Reject"]},
+        {"name": "ClientLocalTime", "display": "Client Local Time", "type": "Text", "maxLength": 50, "description": "Informational device time text. Never used for ordering."},
+        {"name": "ResultCode", "display": "Result Code", "type": "Text", "maxLength": 50},
+        {"name": "ResultMessage", "display": "Result Message", "type": "Note"},
+        {"name": "LedgerKey", "display": "Ledger Key", "type": "Text", "maxLength": 255},
+        {"name": "InventoryEffect", "display": "Inventory Effect", "type": "Choice", "choices": ["NotApplied", "Applied", "Unknown"], "description": "NotApplied is written only when no ledger intent exists (established, not assumed)."},
+        {"name": "AuthorizedByUPN", "display": "Authorized By UPN", "type": "Text", "maxLength": 255},
+        {"name": "ProcessingRunId", "display": "Processing Run Id", "type": "Text", "maxLength": 100},
+        {"name": "ClaimedUtc", "display": "Claimed (UTC)", "type": "DateTime"},
+        {"name": "AttemptCount", "display": "Attempt Count", "type": "Number", "decimals": 0, "min": 0, "default": 0},
+        {"name": "ProcessedUtc", "display": "Processed (UTC)", "type": "DateTime"}
+      ]
+    },
+    {
+      "name": "POULedger",
+      "description": "Append-only movement ledger. Written only by flows. PostingState: Intent (written before stock changes) -> Posted. Voided rows never changed stock.",
+      "titleLabel": "Label",
+      "growth": "thousands per year; the largest list",
+      "fields": [
+        {"name": "LedgerKey", "display": "Ledger Key", "type": "Text", "maxLength": 255, "required": true, "unique": true, "indexed": true, "description": "StockKey#SeqNo. The unique constraint is the compare-and-swap that serialises writers per stock record."},
+        {"name": "RequestID", "display": "Request ID", "type": "Text", "maxLength": 100, "required": true, "unique": true, "indexed": true, "description": "Unique: one ledger row per request, ever (duplicate-posting protection)."},
+        {"name": "LedgerType", "display": "Ledger Type", "type": "Choice", "choices": ["ISSUE", "RECEIPT", "AUDIT", "OPENING", "ADJUSTMENT", "REVERSAL"], "required": true, "indexed": true},
+        {"name": "Origin", "display": "Origin", "type": "Choice", "choices": ["Live", "Legacy"], "default": "Live", "indexed": true},
+        {"name": "AffectsBalance", "display": "Affects Balance", "type": "Boolean", "default": true, "description": "No for legacy rows: they are history only and never replayed against stock."},
+        {"name": "PostingState", "display": "Posting State", "type": "Choice", "choices": ["Intent", "Posted", "Voided"], "default": "Intent", "indexed": true},
+        {"name": "StockKey", "display": "Stock Key", "type": "Text", "maxLength": 200, "indexed": true, "description": "Blank for legacy rows whose location cannot be established."},
+        {"name": "ItemID", "display": "Item ID", "type": "Text", "maxLength": 100, "indexed": true},
+        {"name": "LocationCode", "display": "Location Code", "type": "Text", "maxLength": 50},
+        {"name": "SeqNo", "display": "Seq No", "type": "Number", "decimals": 0, "min": 0},
+        {"name": "QtyDelta", "display": "Qty Delta", "type": "Number", "decimals": 0, "description": "Signed. Blank when unknown (opening, first count, legacy without data)."},
+        {"name": "QtyBefore", "display": "Qty Before", "type": "Number", "decimals": 0, "min": 0},
+        {"name": "QtyAfter", "display": "Qty After", "type": "Number", "decimals": 0, "min": 0},
+        {"name": "BadgeID", "display": "Badge ID", "type": "Text", "maxLength": 50},
+        {"name": "EmployeeName", "display": "Employee Name", "type": "Text", "maxLength": 255},
+        {"name": "StationID", "display": "Station ID", "type": "Text", "maxLength": 50},
+        {"name": "AuthorizedByUPN", "display": "Authorized By UPN", "type": "Text", "maxLength": 255},
+        {"name": "OccurredUtc", "display": "Occurred (UTC)", "type": "DateTime", "indexed": true},
+        {"name": "OccurredLocalText", "display": "Occurred (America/Chicago)", "type": "Text", "maxLength": 40},
+        {"name": "Reason", "display": "Reason", "type": "Text", "maxLength": 255},
+        {"name": "ReversesLedgerKey", "display": "Reverses Ledger Key", "type": "Text", "maxLength": 255, "indexed": true},
+        {"name": "LegacyUser", "display": "Legacy User", "type": "Text", "maxLength": 255, "description": "Name text exactly as recorded in the workbook. Never mapped to a badge."},
+        {"name": "LegacyTimestampText", "display": "Legacy Timestamp Text", "type": "Text", "maxLength": 50, "description": "Original workbook timestamp, unmodified."},
+        {"name": "LegacySource", "display": "Legacy Source", "type": "Text", "maxLength": 100},
+        {"name": "LocationResolution", "display": "Location Resolution", "type": "Choice", "choices": ["Recorded", "UniqueAtCutover", "Unresolved"], "description": "How StockKey was established for legacy rows."}
+      ]
+    },
+    {
+      "name": "POUOpsEvents",
+      "description": "Operational findings raised by monitoring flows (stuck requests, drift, data-health). De-duplicates alert emails.",
+      "titleLabel": "Label",
+      "growth": "tens per week",
+      "fields": [
+        {"name": "EventKey", "display": "Event Key", "type": "Text", "maxLength": 255, "required": true, "unique": true, "indexed": true},
+        {"name": "EventType", "display": "Event Type", "type": "Text", "maxLength": 100, "indexed": true},
+        {"name": "Severity", "display": "Severity", "type": "Choice", "choices": ["Info", "Warning", "Critical"], "default": "Warning"},
+        {"name": "Subject", "display": "Subject", "type": "Text", "maxLength": 255},
+        {"name": "Details", "display": "Details", "type": "Note"},
+        {"name": "FirstSeenUtc", "display": "First Seen (UTC)", "type": "DateTime"},
+        {"name": "LastSeenUtc", "display": "Last Seen (UTC)", "type": "DateTime"},
+        {"name": "OccurrenceCount", "display": "Occurrence Count", "type": "Number", "decimals": 0, "default": 1},
+        {"name": "Resolved", "display": "Resolved", "type": "Boolean", "default": false, "indexed": true}
+      ]
+    }
+  ]
+}
