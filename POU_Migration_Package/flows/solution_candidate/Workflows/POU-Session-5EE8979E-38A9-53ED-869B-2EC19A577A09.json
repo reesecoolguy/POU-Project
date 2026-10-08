@@ -1,0 +1,1119 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_sharepointonline": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "pou_sharedsharepointonline_pou"
+        },
+        "api": {
+          "name": "shared_sharepointonline"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "Button",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "title": "Mode",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "LOGIN or LOGOUT",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_1": {
+                  "title": "BadgeID",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Typed or scanned badge",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_2": {
+                  "title": "StationID",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Station",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_3": {
+                  "title": "SessionID",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "For LOGOUT",
+                  "x-ms-content-hint": "TEXT"
+                },
+                "text_4": {
+                  "title": "ClientAccount",
+                  "type": "string",
+                  "x-ms-dynamically-added": true,
+                  "description": "Signed-in account as reported by the app (used only if the platform header is absent)",
+                  "x-ms-content-hint": "TEXT"
+                }
+              },
+              "required": [
+                "text",
+                "text_1",
+                "text_2",
+                "text_3",
+                "text_4"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Cfg_SiteUrl": {
+          "type": "Compose",
+          "inputs": "https://CHANGE-ME.sharepoint.com/sites/POU",
+          "runAfter": {}
+        },
+        "Guard_site_url_configured": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@contains(outputs('Cfg_SiteUrl'), 'CHANGE-ME')",
+              true
+            ]
+          },
+          "actions": {
+            "Stop_site_url_not_set": {
+              "type": "Terminate",
+              "inputs": {
+                "runStatus": "Failed",
+                "runError": {
+                  "code": "POU_CONFIG",
+                  "message": "Edit the Cfg_SiteUrl action: it still contains CHANGE-ME."
+                }
+              },
+              "runAfter": {}
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "runAfter": {
+            "Cfg_SiteUrl": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Init_vOk": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vOk",
+                "type": "string",
+                "value": "no"
+              }
+            ]
+          },
+          "runAfter": {
+            "Guard_site_url_configured": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "Init_vCode": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vCode",
+                "type": "string",
+                "value": "ERROR"
+              }
+            ]
+          },
+          "runAfter": {
+            "Init_vOk": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Init_vMessage": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vMessage",
+                "type": "string",
+                "value": "Could not complete the request. Try again."
+              }
+            ]
+          },
+          "runAfter": {
+            "Init_vCode": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Init_vSessionId": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vSessionId",
+                "type": "string",
+                "value": ""
+              }
+            ]
+          },
+          "runAfter": {
+            "Init_vMessage": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Init_vName": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vName",
+                "type": "string",
+                "value": ""
+              }
+            ]
+          },
+          "runAfter": {
+            "Init_vSessionId": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Init_vRole": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vRole",
+                "type": "string",
+                "value": ""
+              }
+            ]
+          },
+          "runAfter": {
+            "Init_vName": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_Mode": {
+          "type": "Compose",
+          "inputs": "@toUpper(trim(string(coalesce(triggerBody()?['text'], ''))))",
+          "runAfter": {
+            "Init_vRole": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_Badge": {
+          "type": "Compose",
+          "inputs": "@trim(replace(string(coalesce(triggerBody()?['text_1'], '')), '*', ''))",
+          "runAfter": {
+            "Compose_Mode": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_StationIn": {
+          "type": "Compose",
+          "inputs": "@trim(string(coalesce(triggerBody()?['text_2'], '')))",
+          "runAfter": {
+            "Compose_Badge": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_SessionIn": {
+          "type": "Compose",
+          "inputs": "@trim(string(coalesce(triggerBody()?['text_3'], '')))",
+          "runAfter": {
+            "Compose_StationIn": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_Header": {
+          "type": "Compose",
+          "inputs": "@coalesce(triggerOutputs()?['headers']?['x-ms-user-email-encoded'], '')",
+          "runAfter": {
+            "Compose_SessionIn": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_AppAccount": {
+          "type": "Compose",
+          "inputs": "@toLower(if(empty(outputs('Compose_Header')), trim(string(coalesce(triggerBody()?['text_4'], ''))), decodeBase64(outputs('Compose_Header'))))",
+          "runAfter": {
+            "Compose_Header": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Work": {
+          "type": "Scope",
+          "actions": {
+            "Get_settings": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "HttpRequest",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@outputs('Cfg_SiteUrl')",
+                  "parameters/method": "GET",
+                  "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSettings'')/items', '?', '$select=Id,SettingKey,SettingValue', '&', '$top=500')",
+                  "parameters/headers": {
+                    "Accept": "application/json;odata=verbose"
+                  }
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "Select_settings": {
+              "type": "Select",
+              "inputs": {
+                "from": "@body('Get_settings')?['d']?['results']",
+                "select": "@concat('\"', item()?['SettingKey'], '\":\"', replace(replace(coalesce(item()?['SettingValue'], ''), '\"', ''), '\\', '/'), '\"')"
+              },
+              "runAfter": {
+                "Get_settings": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Compose_Settings": {
+              "type": "Compose",
+              "inputs": "@json(concat('{', join(body('Select_settings'), ','), '}'))",
+              "runAfter": {
+                "Select_settings": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Compose_Messages": {
+              "type": "Compose",
+              "inputs": {
+                "UNKNOWN_TYPE": "Unknown request type.",
+                "NO_SESSION": "You are not signed in. Scan your badge again.",
+                "SESSION_ENDED": "Your session has ended. Scan your badge again.",
+                "SESSION_EXPIRED": "Your session timed out. Scan your badge again.",
+                "SESSION_ACCOUNT_MISMATCH": "This badge session belongs to a different Microsoft sign-in. Scan your badge again.",
+                "EMPLOYEE_INACTIVE": "This badge is not active. See a supervisor.",
+                "STATION_INVALID": "This station is not set up or is inactive. See a supervisor.",
+                "STATION_MISMATCH": "This request came from a different station than the session. Scan your badge again.",
+                "STATION_ACCOUNT_MISMATCH": "This station only accepts its assigned Microsoft account.",
+                "NOT_AUTHORIZED": "This action needs a supervisor who is signed in to Microsoft with their own account.",
+                "SUPERVISOR_REJECTED": "A supervisor rejected this request. Nothing was changed.",
+                "STOCK_NOT_FOUND": "That item/location does not exist. Nothing was changed.",
+                "STOCK_INACTIVE": "That item/location is inactive. Nothing was changed.",
+                "INVALID_QUANTITY": "Quantity must be a whole number of 1 or more. Nothing was changed.",
+                "INVALID_COUNT": "Counted quantity must be a whole number of 0 or more. Nothing was changed.",
+                "NO_BALANCE": "This item/location has no verified quantity yet. A supervisor must count it first (Audit). Nothing was changed.",
+                "BALANCE_UNVERIFIED": "This quantity has not been verified by a count yet. Nothing was changed.",
+                "MISSING_EXPECTED_VERSION": "The count did not record the stock version it started from. Recount. Nothing was changed.",
+                "OPENING_NOT_ALLOWED": "An opening balance can only be set once, on a record with no balance. Nothing was changed.",
+                "REASON_REQUIRED": "A reason is required. Nothing was changed.",
+                "REVERSAL_TARGET_MISSING": "The movement to reverse was not found. Nothing was changed.",
+                "REVERSAL_NOT_POSTED": "Only posted ISSUE or RECEIPT movements can be reversed. Nothing was changed.",
+                "REVERSAL_WRONG_STOCK": "That movement belongs to a different item/location. Nothing was changed.",
+                "REVERSAL_ALREADY": "That movement has already been reversed. Nothing was changed.",
+                "REVERSAL_NEGATIVE": "Reversing would make the quantity negative. Use an ADJUSTMENT instead. Nothing was changed.",
+                "DRIFT_DETECTED": "The stored quantity does not match its history. A supervisor has been alerted. Nothing was changed.",
+                "STOCK_CHANGED_OUTSIDE_PROTOCOL": "The stored quantity was changed outside the normal process while this was being posted. A supervisor has been alerted. Nothing was changed by this request.",
+                "PAYLOAD_INVALID": "The details supplied are incomplete or invalid. Nothing was changed.",
+                "ITEM_EXISTS": "That Item ID already exists. Use 'Add stocking location' to stock it somewhere else. Nothing was changed.",
+                "ITEM_NOT_FOUND": "That Item ID does not exist. Nothing was changed.",
+                "STOCK_EXISTS": "That item is already stocked at that location. Nothing was changed.",
+                "LOCATION_UNKNOWN": "That location is not in the location list (an admin adds locations). Nothing was changed.",
+                "TARGET_NOT_FOUND": "The request being approved was not found.",
+                "TARGET_NOT_WAITING": "That request is not waiting for approval.",
+                "NONZERO_STOCK": "An item/location with stock cannot be deactivated. Count it to zero first. Nothing was changed.",
+                "GAVE_UP": "This could not be processed after several automatic attempts. Nothing was changed. Please repeat it.",
+                "EXPIRED": "No supervisor approved this in time. Nothing was changed. Please repeat it.",
+                "INVALID_BADGE": "Badge not recognised. Try again or see a supervisor.",
+                "BADGE_INACTIVE": "This badge is not active. See a supervisor.",
+                "BAD_MODE": "Unknown session request."
+              },
+              "runAfter": {
+                "Compose_Settings": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "If_login": {
+              "type": "If",
+              "expression": {
+                "equals": [
+                  "@equals(outputs('Compose_Mode'), 'LOGIN')",
+                  true
+                ]
+              },
+              "actions": {
+                "Get_employee": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_sharepointonline",
+                      "operationId": "HttpRequest",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                    },
+                    "parameters": {
+                      "dataset": "@outputs('Cfg_SiteUrl')",
+                      "parameters/method": "GET",
+                      "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUEmployees'')/items', '?', '$filter=', 'BadgeID eq ''', uriComponent(replace(string(coalesce(outputs('Compose_Badge'), 'NONE')), '''', '''''')), '''', '&', '$select=Id,BadgeID,EmployeeName,Active,Role', '&', '$top=2')",
+                      "parameters/headers": {
+                        "Accept": "application/json;odata=verbose"
+                      }
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                },
+                "Compose_Emp": {
+                  "type": "Compose",
+                  "inputs": "@first(body('Get_employee')?['d']?['results'])",
+                  "runAfter": {
+                    "Get_employee": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "Get_station": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_sharepointonline",
+                      "operationId": "HttpRequest",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                    },
+                    "parameters": {
+                      "dataset": "@outputs('Cfg_SiteUrl')",
+                      "parameters/method": "GET",
+                      "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUStations'')/items', '?', '$filter=', 'StationID eq ''', uriComponent(replace(string(coalesce(outputs('Compose_StationIn'), 'NONE')), '''', '''''')), '''', '&', '$select=Id,StationID,Active,ExpectedAccountUPN', '&', '$top=2')",
+                      "parameters/headers": {
+                        "Accept": "application/json;odata=verbose"
+                      }
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {
+                    "Compose_Emp": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "Compose_Stn": {
+                  "type": "Compose",
+                  "inputs": "@first(body('Get_station')?['d']?['results'])",
+                  "runAfter": {
+                    "Get_station": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "Login_Rules1_badge_known_to_station_account": {
+                  "type": "Compose",
+                  "inputs": "@if(empty(if(equals(outputs('Compose_Emp'), null), 'INVALID_BADGE', '')), if(empty(if(and(not(equals(outputs('Compose_Emp'), null)), not(equals(outputs('Compose_Emp')?['Active'], true))), 'BADGE_INACTIVE', '')), if(empty(if(or(equals(outputs('Compose_Stn'), null), not(equals(outputs('Compose_Stn')?['Active'], true))), 'STATION_INVALID', '')), if(and(not(empty(coalesce(outputs('Compose_Stn')?['ExpectedAccountUPN'], ''))), not(equals(toLower(coalesce(outputs('Compose_Stn')?['ExpectedAccountUPN'], '')), outputs('Compose_AppAccount')))), 'STATION_ACCOUNT_MISMATCH', ''), if(or(equals(outputs('Compose_Stn'), null), not(equals(outputs('Compose_Stn')?['Active'], true))), 'STATION_INVALID', '')), if(and(not(equals(outputs('Compose_Emp'), null)), not(equals(outputs('Compose_Emp')?['Active'], true))), 'BADGE_INACTIVE', '')), if(equals(outputs('Compose_Emp'), null), 'INVALID_BADGE', ''))",
+                  "runAfter": {
+                    "Compose_Stn": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "Login_Result": {
+                  "type": "Compose",
+                  "inputs": "@outputs('Login_Rules1_badge_known_to_station_account')",
+                  "runAfter": {
+                    "Login_Rules1_badge_known_to_station_account": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "If_login_fail": {
+                  "type": "If",
+                  "expression": {
+                    "equals": [
+                      "@not(empty(outputs('Login_Result')))",
+                      true
+                    ]
+                  },
+                  "actions": {
+                    "Set_login_fail": {
+                      "type": "Scope",
+                      "actions": {
+                        "Set_login_fail_vCode": {
+                          "type": "SetVariable",
+                          "inputs": {
+                            "name": "vCode",
+                            "value": "@outputs('Login_Result')"
+                          },
+                          "runAfter": {}
+                        },
+                        "Set_login_fail_vMessage": {
+                          "type": "SetVariable",
+                          "inputs": {
+                            "name": "vMessage",
+                            "value": "@coalesce(outputs('Compose_Messages')?[outputs('Login_Result')], outputs('Login_Result'))"
+                          },
+                          "runAfter": {
+                            "Set_login_fail_vCode": [
+                              "Succeeded"
+                            ]
+                          }
+                        }
+                      },
+                      "runAfter": {}
+                    },
+                    "If_log_bad_badge": {
+                      "type": "If",
+                      "expression": {
+                        "equals": [
+                          "@equals(outputs('Login_Result'), 'INVALID_BADGE')",
+                          true
+                        ]
+                      },
+                      "actions": {
+                        "Badge_Ops_event": {
+                          "type": "Scope",
+                          "actions": {
+                            "Badge_Get_event": {
+                              "type": "ApiConnection",
+                              "inputs": {
+                                "host": {
+                                  "connectionName": "shared_sharepointonline",
+                                  "operationId": "HttpRequest",
+                                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                                },
+                                "parameters": {
+                                  "dataset": "@outputs('Cfg_SiteUrl')",
+                                  "parameters/method": "GET",
+                                  "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUOpsEvents'')/items', '?', '$filter=', 'EventKey eq ''', uriComponent(replace(string(concat('BADGEFAIL|', outputs('Compose_StationIn'), '|', formatDateTime(utcNow(), 'yyyy-MM-dd'))), '''', '''''')), '''', '&', '$select=Id,OccurrenceCount', '&', '$top=2')",
+                                  "parameters/headers": {
+                                    "Accept": "application/json;odata=verbose"
+                                  }
+                                },
+                                "authentication": "@parameters('$authentication')"
+                              },
+                              "runAfter": {}
+                            },
+                            "Badge_Event_row": {
+                              "type": "Compose",
+                              "inputs": "@first(body('Badge_Get_event')?['d']?['results'])",
+                              "runAfter": {
+                                "Badge_Get_event": [
+                                  "Succeeded"
+                                ]
+                              }
+                            },
+                            "Badge_Event_exists": {
+                              "type": "If",
+                              "expression": {
+                                "equals": [
+                                  "@not(equals(outputs('Badge_Event_row'), null))",
+                                  true
+                                ]
+                              },
+                              "actions": {
+                                "Badge_Update_event": {
+                                  "type": "ApiConnection",
+                                  "inputs": {
+                                    "host": {
+                                      "connectionName": "shared_sharepointonline",
+                                      "operationId": "HttpRequest",
+                                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                                    },
+                                    "parameters": {
+                                      "dataset": "@outputs('Cfg_SiteUrl')",
+                                      "parameters/method": "POST",
+                                      "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUOpsEvents'')/items(', outputs('Badge_Event_row')?['Id'], ')')",
+                                      "parameters/headers": {
+                                        "Accept": "application/json;odata=verbose",
+                                        "Content-Type": "application/json;odata=verbose",
+                                        "X-HTTP-Method": "MERGE",
+                                        "IF-MATCH": "*"
+                                      },
+                                      "parameters/body": {
+                                        "__metadata": {
+                                          "type": "SP.Data.POUOpsEventsListItem"
+                                        },
+                                        "LastSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                        "OccurrenceCount": "@add(int(coalesce(outputs('Badge_Event_row')?['OccurrenceCount'], 1)), 1)",
+                                        "Details": "@concat('Unrecognised badge attempts today at station ', outputs('Compose_StationIn'), '. Repeated failures may mean guessing. Last typed value length: ', string(length(outputs('Compose_Badge'))))",
+                                        "Resolved": false
+                                      }
+                                    },
+                                    "authentication": "@parameters('$authentication')"
+                                  },
+                                  "runAfter": {}
+                                }
+                              },
+                              "else": {
+                                "actions": {
+                                  "Badge_Create_event": {
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                      "host": {
+                                        "connectionName": "shared_sharepointonline",
+                                        "operationId": "HttpRequest",
+                                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                                      },
+                                      "parameters": {
+                                        "dataset": "@outputs('Cfg_SiteUrl')",
+                                        "parameters/method": "POST",
+                                        "parameters/uri": "/_api/web/lists/getbytitle('POUOpsEvents')/items",
+                                        "parameters/headers": {
+                                          "Accept": "application/json;odata=verbose",
+                                          "Content-Type": "application/json;odata=verbose"
+                                        },
+                                        "parameters/body": {
+                                          "__metadata": {
+                                            "type": "SP.Data.POUOpsEventsListItem"
+                                          },
+                                          "Title": "@concat('Unknown badge scanned at ', outputs('Compose_StationIn'))",
+                                          "EventKey": "@concat('BADGEFAIL|', outputs('Compose_StationIn'), '|', formatDateTime(utcNow(), 'yyyy-MM-dd'))",
+                                          "EventType": "BADGE_FAILURES",
+                                          "Severity": "Warning",
+                                          "Subject": "@concat('Unknown badge scanned at ', outputs('Compose_StationIn'))",
+                                          "Details": "@concat('Unrecognised badge attempts today at station ', outputs('Compose_StationIn'), '. Repeated failures may mean guessing. Last typed value length: ', string(length(outputs('Compose_Badge'))))",
+                                          "FirstSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                          "LastSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                          "OccurrenceCount": 1,
+                                          "Resolved": false
+                                        }
+                                      },
+                                      "authentication": "@parameters('$authentication')"
+                                    },
+                                    "runAfter": {}
+                                  }
+                                }
+                              },
+                              "runAfter": {
+                                "Badge_Event_row": [
+                                  "Succeeded"
+                                ]
+                              }
+                            }
+                          },
+                          "runAfter": {}
+                        }
+                      },
+                      "else": {
+                        "actions": {}
+                      },
+                      "runAfter": {
+                        "Set_login_fail": [
+                          "Succeeded",
+                          "Failed",
+                          "Skipped",
+                          "TimedOut"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  },
+                  "runAfter": {
+                    "Login_Result": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "If_login_ok": {
+                  "type": "If",
+                  "expression": {
+                    "equals": [
+                      "@equals(outputs('Login_Result'), '')",
+                      true
+                    ]
+                  },
+                  "actions": {
+                    "Compose_NewSessionId": {
+                      "type": "Compose",
+                      "inputs": "@replace(guid(), '-', '')",
+                      "runAfter": {}
+                    },
+                    "Create_session": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_sharepointonline",
+                          "operationId": "HttpRequest",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                        },
+                        "parameters": {
+                          "dataset": "@outputs('Cfg_SiteUrl')",
+                          "parameters/method": "POST",
+                          "parameters/uri": "/_api/web/lists/getbytitle('POUSessions')/items",
+                          "parameters/headers": {
+                            "Accept": "application/json;odata=verbose",
+                            "Content-Type": "application/json;odata=verbose"
+                          },
+                          "parameters/body": {
+                            "__metadata": {
+                              "type": "SP.Data.POUSessionsListItem"
+                            },
+                            "Title": "@concat('Session ', outputs('Compose_Emp')?['EmployeeName'], ' @ ', outputs('Compose_StationIn'))",
+                            "SessionID": "@outputs('Compose_NewSessionId')",
+                            "BadgeID": "@outputs('Compose_Emp')?['BadgeID']",
+                            "EmployeeName": "@outputs('Compose_Emp')?['EmployeeName']",
+                            "StationID": "@outputs('Compose_StationIn')",
+                            "AppAccountUPN": "@outputs('Compose_AppAccount')",
+                            "StartedUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                            "LastActivityUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                            "SessionState": "Active"
+                          }
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      },
+                      "runAfter": {
+                        "Compose_NewSessionId": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "If_session_created": {
+                      "type": "If",
+                      "expression": {
+                        "equals": [
+                          "@equals(actions('Create_session')?['status'], 'Succeeded')",
+                          true
+                        ]
+                      },
+                      "actions": {
+                        "Set_login_ok": {
+                          "type": "Scope",
+                          "actions": {
+                            "Set_login_ok_vOk": {
+                              "type": "SetVariable",
+                              "inputs": {
+                                "name": "vOk",
+                                "value": "yes"
+                              },
+                              "runAfter": {}
+                            },
+                            "Set_login_ok_vCode": {
+                              "type": "SetVariable",
+                              "inputs": {
+                                "name": "vCode",
+                                "value": "OK"
+                              },
+                              "runAfter": {
+                                "Set_login_ok_vOk": [
+                                  "Succeeded"
+                                ]
+                              }
+                            },
+                            "Set_login_ok_vMessage": {
+                              "type": "SetVariable",
+                              "inputs": {
+                                "name": "vMessage",
+                                "value": "@concat('Welcome, ', outputs('Compose_Emp')?['EmployeeName'])"
+                              },
+                              "runAfter": {
+                                "Set_login_ok_vCode": [
+                                  "Succeeded"
+                                ]
+                              }
+                            },
+                            "Set_login_ok_vSessionId": {
+                              "type": "SetVariable",
+                              "inputs": {
+                                "name": "vSessionId",
+                                "value": "@outputs('Compose_NewSessionId')"
+                              },
+                              "runAfter": {
+                                "Set_login_ok_vMessage": [
+                                  "Succeeded"
+                                ]
+                              }
+                            },
+                            "Set_login_ok_vName": {
+                              "type": "SetVariable",
+                              "inputs": {
+                                "name": "vName",
+                                "value": "@outputs('Compose_Emp')?['EmployeeName']"
+                              },
+                              "runAfter": {
+                                "Set_login_ok_vSessionId": [
+                                  "Succeeded"
+                                ]
+                              }
+                            },
+                            "Set_login_ok_vRole": {
+                              "type": "SetVariable",
+                              "inputs": {
+                                "name": "vRole",
+                                "value": "@coalesce(outputs('Compose_Emp')?['Role'], 'Operator')"
+                              },
+                              "runAfter": {
+                                "Set_login_ok_vName": [
+                                  "Succeeded"
+                                ]
+                              }
+                            }
+                          },
+                          "runAfter": {}
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Set_login_error": {
+                            "type": "Scope",
+                            "actions": {
+                              "Set_login_error_vCode": {
+                                "type": "SetVariable",
+                                "inputs": {
+                                  "name": "vCode",
+                                  "value": "SESSION_NOT_CREATED"
+                                },
+                                "runAfter": {}
+                              },
+                              "Set_login_error_vMessage": {
+                                "type": "SetVariable",
+                                "inputs": {
+                                  "name": "vMessage",
+                                  "value": "Could not start a session. Try again."
+                                },
+                                "runAfter": {
+                                  "Set_login_error_vCode": [
+                                    "Succeeded"
+                                  ]
+                                }
+                              }
+                            },
+                            "runAfter": {}
+                          }
+                        }
+                      },
+                      "runAfter": {
+                        "Create_session": [
+                          "Succeeded",
+                          "Failed",
+                          "Skipped",
+                          "TimedOut"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  },
+                  "runAfter": {
+                    "If_login_fail": [
+                      "Succeeded",
+                      "Failed",
+                      "Skipped",
+                      "TimedOut"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "Compose_Messages": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "If_logout": {
+              "type": "If",
+              "expression": {
+                "equals": [
+                  "@equals(outputs('Compose_Mode'), 'LOGOUT')",
+                  true
+                ]
+              },
+              "actions": {
+                "Get_session_out": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_sharepointonline",
+                      "operationId": "HttpRequest",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                    },
+                    "parameters": {
+                      "dataset": "@outputs('Cfg_SiteUrl')",
+                      "parameters/method": "GET",
+                      "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSessions'')/items', '?', '$filter=', 'SessionID eq ''', uriComponent(replace(string(coalesce(outputs('Compose_SessionIn'), 'NONE')), '''', '''''')), '''', '&', '$select=Id,AppAccountUPN,SessionState', '&', '$top=2')",
+                      "parameters/headers": {
+                        "Accept": "application/json;odata=verbose"
+                      }
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                },
+                "Compose_SessOut": {
+                  "type": "Compose",
+                  "inputs": "@first(body('Get_session_out')?['d']?['results'])",
+                  "runAfter": {
+                    "Get_session_out": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "If_can_end": {
+                  "type": "If",
+                  "expression": {
+                    "equals": [
+                      "@and(not(equals(outputs('Compose_SessOut'), null)), equals(toLower(coalesce(outputs('Compose_SessOut')?['AppAccountUPN'], '')), outputs('Compose_AppAccount')))",
+                      true
+                    ]
+                  },
+                  "actions": {
+                    "End_session": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_sharepointonline",
+                          "operationId": "HttpRequest",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                        },
+                        "parameters": {
+                          "dataset": "@outputs('Cfg_SiteUrl')",
+                          "parameters/method": "POST",
+                          "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSessions'')/items(', outputs('Compose_SessOut')?['Id'], ')')",
+                          "parameters/headers": {
+                            "Accept": "application/json;odata=verbose",
+                            "Content-Type": "application/json;odata=verbose",
+                            "X-HTTP-Method": "MERGE",
+                            "IF-MATCH": "*"
+                          },
+                          "parameters/body": {
+                            "__metadata": {
+                              "type": "SP.Data.POUSessionsListItem"
+                            },
+                            "SessionState": "Ended",
+                            "EndedReason": "logout"
+                          }
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      },
+                      "runAfter": {}
+                    },
+                    "If_ended": {
+                      "type": "If",
+                      "expression": {
+                        "equals": [
+                          "@equals(actions('End_session')?['status'], 'Succeeded')",
+                          true
+                        ]
+                      },
+                      "actions": {
+                        "Set_logout_ok": {
+                          "type": "Scope",
+                          "actions": {
+                            "Set_logout_ok_vOk": {
+                              "type": "SetVariable",
+                              "inputs": {
+                                "name": "vOk",
+                                "value": "yes"
+                              },
+                              "runAfter": {}
+                            },
+                            "Set_logout_ok_vCode": {
+                              "type": "SetVariable",
+                              "inputs": {
+                                "name": "vCode",
+                                "value": "OK"
+                              },
+                              "runAfter": {
+                                "Set_logout_ok_vOk": [
+                                  "Succeeded"
+                                ]
+                              }
+                            },
+                            "Set_logout_ok_vMessage": {
+                              "type": "SetVariable",
+                              "inputs": {
+                                "name": "vMessage",
+                                "value": "Signed out."
+                              },
+                              "runAfter": {
+                                "Set_logout_ok_vCode": [
+                                  "Succeeded"
+                                ]
+                              }
+                            }
+                          },
+                          "runAfter": {}
+                        }
+                      },
+                      "else": {
+                        "actions": {}
+                      },
+                      "runAfter": {
+                        "End_session": [
+                          "Succeeded",
+                          "Failed",
+                          "Skipped",
+                          "TimedOut"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  },
+                  "runAfter": {
+                    "Compose_SessOut": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "If_login": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped",
+                  "TimedOut"
+                ]
+              }
+            },
+            "If_bad_mode": {
+              "type": "If",
+              "expression": {
+                "equals": [
+                  "@not(contains(createArray('LOGIN', 'LOGOUT'), outputs('Compose_Mode')))",
+                  true
+                ]
+              },
+              "actions": {
+                "Set_bad_mode": {
+                  "type": "Scope",
+                  "actions": {
+                    "Set_bad_mode_vCode": {
+                      "type": "SetVariable",
+                      "inputs": {
+                        "name": "vCode",
+                        "value": "BAD_MODE"
+                      },
+                      "runAfter": {}
+                    },
+                    "Set_bad_mode_vMessage": {
+                      "type": "SetVariable",
+                      "inputs": {
+                        "name": "vMessage",
+                        "value": "@coalesce(outputs('Compose_Messages')?['BAD_MODE'], 'BAD_MODE')"
+                      },
+                      "runAfter": {
+                        "Set_bad_mode_vCode": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "If_logout": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped",
+                  "TimedOut"
+                ]
+              }
+            }
+          },
+          "runAfter": {
+            "Compose_AppAccount": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Respond": {
+          "type": "Response",
+          "kind": "PowerApp",
+          "inputs": {
+            "statusCode": 200,
+            "body": {
+              "ok": "@variables('vOk')",
+              "code": "@variables('vCode')",
+              "message": "@variables('vMessage')",
+              "sessionId": "@variables('vSessionId')",
+              "employeeName": "@variables('vName')",
+              "role": "@variables('vRole')",
+              "idleMinutes": "@string(int(coalesce(outputs('Compose_Settings')?['IdleTimeoutMinutes'], '3')))"
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "ok": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "sessionId": {
+                  "type": "string"
+                },
+                "employeeName": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "idleMinutes": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "runAfter": {
+            "Work": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        }
+      }
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}

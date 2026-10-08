@@ -74,7 +74,7 @@ def preamble(flow: Flow, site_url: str = DEFAULT_SITE_URL):
 
 
 def load_settings(blk: Block, prefix=""):
-    blk.sp_get(f"{prefix}Get_settings", L_SETTINGS, select="SettingKey,SettingValue", top=500, filter_parts=None)
+    blk.sp_get(f"{prefix}Get_settings", L_SETTINGS, select="Id,SettingKey,SettingValue", top=500, filter_parts=None)
     blk.select(f"{prefix}Select_settings", X(Ex(f"body('{prefix}Get_settings')?['d']?['results']")),
                "@concat('\"', item()?['SettingKey'], '\":\"', replace(replace(coalesce(item()?['SettingValue'], ''), '\"', ''), '\\', '/'), '\"')")
     blk.compose(f"{prefix}Compose_Settings", X(f"json(concat('{{', join(body('{prefix}Select_settings'), ','), '}}'))"))

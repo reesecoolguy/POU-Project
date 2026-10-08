@@ -7,6 +7,7 @@ from typing import Any
 
 SCHEMA = "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#"
 ALL = ["Succeeded", "Failed", "Skipped", "TimedOut"]
+CONTAINERS = {"Scope", "If", "Foreach", "Until", "Switch"}
 SP_CONN = "shared_sharepointonline"
 MAIL_CONN = "shared_office365"
 LIST_TYPE = lambda ln: f"SP.Data.{ln}ListItem"
@@ -101,6 +102,7 @@ class Block:
         self.flow = flow
         self.actions: dict[str, dict] = {}
         self.last: str | None = None
+        self.last_type: str | None = None
 
     def add(self, name: str, action: dict, after: dict | None = None, always: bool = False) -> str:
         self.flow.register(name)
@@ -108,7 +110,9 @@ class Block:
             ra = after
         elif self.last is None:
             ra = {}
-        elif always:
+        elif always or self.last_type in CONTAINERS:
+            # A step that follows a container (scope / condition / loop) runs whatever the container reports: a failure that was
+            # handled INSIDE it must not silently skip the rest of the chain. Safety comes from variable guards, not from run-after.
             ra = {self.last: list(ALL)}
         else:
             ra = {self.last: ["Succeeded"]}
@@ -116,6 +120,7 @@ class Block:
         action["runAfter"] = ra
         self.actions[name] = action
         self.last = name
+        self.last_type = action["type"]
         return name
 
     # ---- primitives -------------------------------------------------------------------------
@@ -215,7 +220,8 @@ class Block:
         if filter_parts is not None:
             q.append(["$filter="] + list(filter_parts))
         if select: q.append([f"$select={select}"])
-        if top: q.append([f"$top={top}"])
+        if top:
+            q.append(["$top=", top] if isinstance(top, str) else [f"$top={top}"])
         if orderby: q.append([f"$orderby={orderby}"])
         if expand: q.append([f"$expand={expand}"])
         parts = [f"/_api/web/lists/getbytitle('{list_name}')/items"]
@@ -238,10 +244,9 @@ class Block:
         return self.sp(name, "POST", uri, None, headers={"X-HTTP-Method": "DELETE", "IF-MATCH": "*"}, **kw)
 
     def attempt(self, name, make, **kw):
-        """Scope holding ONE risky action; its failure is examined by the next step via ok(name)."""
-        inner = Block(self.flow)
-        make(inner, name)
-        return self.add(f"Attempt_{name}", {"type": "Scope", "actions": inner.actions}, **kw)
+        """A risky action whose failure is examined by the NEXT step (always=True) via ok(name) = actions(name)?['status'].
+        Deliberately NOT wrapped in a scope: no dependence on how a container reports a handled failure, and one nesting level less."""
+        return make(self, name)
 
     def mail(self, name, to, subject, body, attachments=None, **kw):
         params = {"emailMessage/To": to, "emailMessage/Subject": subject, "emailMessage/Body": body, "emailMessage/Importance": "Normal"}

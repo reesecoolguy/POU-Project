@@ -1,0 +1,1000 @@
+{
+  "name": "POU-Reconcile",
+  "displayName": "POU - Nightly balance-to-ledger reconciliation",
+  "description": "Hourly tick; once per night: proves OnHandQty == the ledger row for StockVersion, repairs LowStockFlag, raises ops events, purges old requests/sessions.",
+  "connectionReferences": {
+    "shared_sharepointonline": {
+      "runtimeSource": "embedded",
+      "connection": {
+        "connectionReferenceLogicalName": "pou_sharedsharepointonline_pou"
+      },
+      "api": {
+        "name": "shared_sharepointonline"
+      }
+    },
+    "shared_office365": {
+      "runtimeSource": "embedded",
+      "connection": {
+        "connectionReferenceLogicalName": "pou_sharedoffice365_pou"
+      },
+      "api": {
+        "name": "shared_office365"
+      }
+    }
+  },
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "$connections": {
+        "defaultValue": {},
+        "type": "Object"
+      },
+      "$authentication": {
+        "defaultValue": {},
+        "type": "SecureObject"
+      }
+    },
+    "triggers": {
+      "Recurrence": {
+        "type": "Recurrence",
+        "recurrence": {
+          "frequency": "Hour",
+          "interval": 1
+        },
+        "metadata": {
+          "operationMetadataId": "00000000-0000-0000-0000-000000000000"
+        }
+      }
+    },
+    "actions": {
+      "Cfg_SiteUrl": {
+        "type": "Compose",
+        "inputs": "https://CHANGE-ME.sharepoint.com/sites/POU",
+        "runAfter": {}
+      },
+      "Guard_site_url_configured": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@contains(outputs('Cfg_SiteUrl'), 'CHANGE-ME')",
+            true
+          ]
+        },
+        "actions": {
+          "Stop_site_url_not_set": {
+            "type": "Terminate",
+            "inputs": {
+              "runStatus": "Failed",
+              "runError": {
+                "code": "POU_CONFIG",
+                "message": "Edit the Cfg_SiteUrl action: it still contains CHANGE-ME."
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Cfg_SiteUrl": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Get_settings": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connectionName": "shared_sharepointonline",
+            "operationId": "HttpRequest",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+          },
+          "parameters": {
+            "dataset": "@outputs('Cfg_SiteUrl')",
+            "parameters/method": "GET",
+            "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSettings'')/items', '?', '$select=Id,SettingKey,SettingValue', '&', '$top=500')",
+            "parameters/headers": {
+              "Accept": "application/json;odata=verbose"
+            }
+          },
+          "authentication": "@parameters('$authentication')"
+        },
+        "runAfter": {
+          "Guard_site_url_configured": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Select_settings": {
+        "type": "Select",
+        "inputs": {
+          "from": "@body('Get_settings')?['d']?['results']",
+          "select": "@concat('\"', item()?['SettingKey'], '\":\"', replace(replace(coalesce(item()?['SettingValue'], ''), '\"', ''), '\\', '/'), '\"')"
+        },
+        "runAfter": {
+          "Get_settings": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Compose_Settings": {
+        "type": "Compose",
+        "inputs": "@json(concat('{', join(body('Select_settings'), ','), '}'))",
+        "runAfter": {
+          "Select_settings": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Compose_LocalDate": {
+        "type": "Compose",
+        "inputs": "@convertFromUtc(utcNow(), coalesce(outputs('Compose_Settings')?['DisplayTimeZoneWindows'], 'Central Standard Time'), 'yyyy-MM-dd')",
+        "runAfter": {
+          "Compose_Settings": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Compose_LocalHour": {
+        "type": "Compose",
+        "inputs": "@int(convertFromUtc(utcNow(), coalesce(outputs('Compose_Settings')?['DisplayTimeZoneWindows'], 'Central Standard Time'), 'HH'))",
+        "runAfter": {
+          "Compose_LocalDate": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Compose_LocalDow": {
+        "type": "Compose",
+        "inputs": "@toLower(convertFromUtc(utcNow(), coalesce(outputs('Compose_Settings')?['DisplayTimeZoneWindows'], 'Central Standard Time'), 'dddd'))",
+        "runAfter": {
+          "Compose_LocalHour": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Compose_Due": {
+        "type": "Compose",
+        "inputs": "@and(greaterOrEquals(outputs('Compose_LocalHour'), int(coalesce(outputs('Compose_Settings')?['ReconcileHourLocal'], '7'))), not(equals(coalesce(outputs('Compose_Settings')?['LastReconcileDate'], ''), outputs('Compose_LocalDate'))))",
+        "runAfter": {
+          "Compose_LocalDow": [
+            "Succeeded"
+          ]
+        }
+      },
+      "If_not_due": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@equals(outputs('Compose_Due'), false)",
+            true
+          ]
+        },
+        "actions": {
+          "Stop_not_due": {
+            "type": "Terminate",
+            "inputs": {
+              "runStatus": "Succeeded"
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Compose_Due": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Init_vStock": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "vStock",
+              "type": "array",
+              "value": []
+            }
+          ]
+        },
+        "runAfter": {
+          "If_not_due": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Init_vStockNext": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "vStockNext",
+              "type": "string",
+              "value": ""
+            }
+          ]
+        },
+        "runAfter": {
+          "Init_vStock": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Init_vFindings": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "vFindings",
+              "type": "array",
+              "value": []
+            }
+          ]
+        },
+        "runAfter": {
+          "Init_vStockNext": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Init_vFixed": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "vFixed",
+              "type": "integer",
+              "value": 0
+            }
+          ]
+        },
+        "runAfter": {
+          "Init_vFindings": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Init_vChecked": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "vChecked",
+              "type": "integer",
+              "value": 0
+            }
+          ]
+        },
+        "runAfter": {
+          "Init_vFixed": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Stock_reset_rows": {
+        "type": "SetVariable",
+        "inputs": {
+          "name": "vStock",
+          "value": []
+        },
+        "runAfter": {
+          "Init_vChecked": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Stock_first_uri": {
+        "type": "SetVariable",
+        "inputs": {
+          "name": "vStockNext",
+          "value": "@concat('/_api/web/lists/getbytitle(''POUStockLocations'')/items?$top=500&$select=Id,StockKey,ItemID,OnHandQty,StockVersion,MinQty,LowStockFlag,BalanceStatus,Active')"
+        },
+        "runAfter": {
+          "Stock_reset_rows": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Stock_until": {
+        "type": "Until",
+        "expression": "@empty(variables('vStockNext'))",
+        "limit": {
+          "count": 100,
+          "timeout": "PT1H"
+        },
+        "actions": {
+          "Stock_page": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_sharepointonline",
+                "operationId": "HttpRequest",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+              },
+              "parameters": {
+                "dataset": "@outputs('Cfg_SiteUrl')",
+                "parameters/method": "GET",
+                "parameters/uri": "@variables('vStockNext')",
+                "parameters/headers": {
+                  "Accept": "application/json;odata=verbose"
+                }
+              },
+              "authentication": "@parameters('$authentication')"
+            },
+            "runAfter": {}
+          },
+          "Stock_append": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "vStock",
+              "value": "@union(variables('vStock'), coalesce(body('Stock_page')?['d']?['results'], createArray()))"
+            },
+            "runAfter": {
+              "Stock_page": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Stock_next": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "vStockNext",
+              "value": "@if(empty(coalesce(body('Stock_page')?['d']?['__next'], '')), '', substring(body('Stock_page')?['d']?['__next'], indexOf(body('Stock_page')?['d']?['__next'], '/_api/')))"
+            },
+            "runAfter": {
+              "Stock_append": [
+                "Succeeded"
+              ]
+            }
+          }
+        },
+        "runAfter": {
+          "Stock_first_uri": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Filter_rows_to_check": {
+        "type": "Query",
+        "inputs": {
+          "from": "@variables('vStock')",
+          "where": "@and(equals(item()?['Active'], true), not(and(equals(coalesce(item()?['StockVersion'], 0), 0), equals(item()?['OnHandQty'], null), equals(coalesce(item()?['LowStockFlag'], false), false))))"
+        },
+        "runAfter": {
+          "Stock_until": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "For_each_stock": {
+        "type": "Foreach",
+        "foreach": "@body('Filter_rows_to_check')",
+        "actions": {
+          "Count_checked": {
+            "type": "IncrementVariable",
+            "inputs": {
+              "name": "vChecked",
+              "value": 1
+            },
+            "runAfter": {}
+          },
+          "Get_ledger_pair": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_sharepointonline",
+                "operationId": "HttpRequest",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+              },
+              "parameters": {
+                "dataset": "@outputs('Cfg_SiteUrl')",
+                "parameters/method": "GET",
+                "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POULedger'')/items', '?', '$filter=', 'LedgerKey eq ''', uriComponent(replace(string(concat(items('For_each_stock')?['StockKey'], '#', string(int(coalesce(items('For_each_stock')?['StockVersion'], 0))))), '''', '''''')), ''' or LedgerKey eq ''', uriComponent(replace(string(concat(items('For_each_stock')?['StockKey'], '#', string(add(int(coalesce(items('For_each_stock')?['StockVersion'], 0)), 1)))), '''', '''''')), '''', '&', '$select=LedgerKey,SeqNo,PostingState,QtyAfter,Created', '&', '$top=5')",
+                "parameters/headers": {
+                  "Accept": "application/json;odata=verbose"
+                }
+              },
+              "authentication": "@parameters('$authentication')"
+            },
+            "runAfter": {
+              "Count_checked": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Pick_current": {
+            "type": "Query",
+            "inputs": {
+              "from": "@body('Get_ledger_pair')?['d']?['results']",
+              "where": "@equals(item()?['SeqNo'], int(coalesce(items('For_each_stock')?['StockVersion'], 0)))"
+            },
+            "runAfter": {
+              "Get_ledger_pair": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Pick_next": {
+            "type": "Query",
+            "inputs": {
+              "from": "@body('Get_ledger_pair')?['d']?['results']",
+              "where": "@equals(item()?['SeqNo'], add(int(coalesce(items('For_each_stock')?['StockVersion'], 0)), 1))"
+            },
+            "runAfter": {
+              "Pick_current": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Compose_problem": {
+            "type": "Compose",
+            "inputs": "@if(and(equals(int(coalesce(items('For_each_stock')?['StockVersion'], 0)), 0), not(equals(items('For_each_stock')?['OnHandQty'], null))), 'BALANCE_WITHOUT_LEDGER', if(and(greater(int(coalesce(items('For_each_stock')?['StockVersion'], 0)), 0), equals(first(body('Pick_current')), null)), 'LEDGER_ROW_MISSING', if(and(greater(int(coalesce(items('For_each_stock')?['StockVersion'], 0)), 0), not(equals(first(body('Pick_current')), null)), not(equals(first(body('Pick_current'))?['QtyAfter'], items('For_each_stock')?['OnHandQty']))), 'BALANCE_MISMATCH', if(and(not(equals(first(body('Pick_next')), null)), equals(first(body('Pick_next'))?['PostingState'], 'Posted')), 'STOCK_BEHIND_LEDGER', if(and(not(equals(first(body('Pick_next')), null)), greater(sub(ticks(utcNow()), ticks(coalesce(first(body('Pick_next'))?['Created'], utcNow()))), mul(int(coalesce(outputs('Compose_Settings')?['StaleIntentMinutes'], '5')), 12000000000))), 'STALE_INTENT', '')))))",
+            "runAfter": {
+              "Pick_next": [
+                "Succeeded"
+              ]
+            }
+          },
+          "If_problem": {
+            "type": "If",
+            "expression": {
+              "equals": [
+                "@not(empty(outputs('Compose_problem')))",
+                true
+              ]
+            },
+            "actions": {
+              "Rec_Ops_event": {
+                "type": "Scope",
+                "actions": {
+                  "Rec_Get_event": {
+                    "type": "ApiConnection",
+                    "inputs": {
+                      "host": {
+                        "connectionName": "shared_sharepointonline",
+                        "operationId": "HttpRequest",
+                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                      },
+                      "parameters": {
+                        "dataset": "@outputs('Cfg_SiteUrl')",
+                        "parameters/method": "GET",
+                        "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUOpsEvents'')/items', '?', '$filter=', 'EventKey eq ''', uriComponent(replace(string(concat('RECON|', outputs('Compose_problem'), '|', items('For_each_stock')?['StockKey'])), '''', '''''')), '''', '&', '$select=Id,OccurrenceCount', '&', '$top=2')",
+                        "parameters/headers": {
+                          "Accept": "application/json;odata=verbose"
+                        }
+                      },
+                      "authentication": "@parameters('$authentication')"
+                    },
+                    "runAfter": {}
+                  },
+                  "Rec_Event_row": {
+                    "type": "Compose",
+                    "inputs": "@first(body('Rec_Get_event')?['d']?['results'])",
+                    "runAfter": {
+                      "Rec_Get_event": [
+                        "Succeeded"
+                      ]
+                    }
+                  },
+                  "Rec_Event_exists": {
+                    "type": "If",
+                    "expression": {
+                      "equals": [
+                        "@not(equals(outputs('Rec_Event_row'), null))",
+                        true
+                      ]
+                    },
+                    "actions": {
+                      "Rec_Update_event": {
+                        "type": "ApiConnection",
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_sharepointonline",
+                            "operationId": "HttpRequest",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                          },
+                          "parameters": {
+                            "dataset": "@outputs('Cfg_SiteUrl')",
+                            "parameters/method": "POST",
+                            "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUOpsEvents'')/items(', outputs('Rec_Event_row')?['Id'], ')')",
+                            "parameters/headers": {
+                              "Accept": "application/json;odata=verbose",
+                              "Content-Type": "application/json;odata=verbose",
+                              "X-HTTP-Method": "MERGE",
+                              "IF-MATCH": "*"
+                            },
+                            "parameters/body": {
+                              "__metadata": {
+                                "type": "SP.Data.POUOpsEventsListItem"
+                              },
+                              "LastSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                              "OccurrenceCount": "@add(int(coalesce(outputs('Rec_Event_row')?['OccurrenceCount'], 1)), 1)",
+                              "Details": "@concat('On hand ', string(items('For_each_stock')?['OnHandQty']), ', stock version ', string(int(coalesce(items('For_each_stock')?['StockVersion'], 0))), '. Ledger row at that version: ', string(coalesce(first(body('Pick_current'))?['QtyAfter'], 'none')), '. Posting for this record is blocked until resolved (see docs/10_Maintenance.md).')",
+                              "Resolved": false
+                            }
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        },
+                        "runAfter": {}
+                      }
+                    },
+                    "else": {
+                      "actions": {
+                        "Rec_Create_event": {
+                          "type": "ApiConnection",
+                          "inputs": {
+                            "host": {
+                              "connectionName": "shared_sharepointonline",
+                              "operationId": "HttpRequest",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                            },
+                            "parameters": {
+                              "dataset": "@outputs('Cfg_SiteUrl')",
+                              "parameters/method": "POST",
+                              "parameters/uri": "/_api/web/lists/getbytitle('POUOpsEvents')/items",
+                              "parameters/headers": {
+                                "Accept": "application/json;odata=verbose",
+                                "Content-Type": "application/json;odata=verbose"
+                              },
+                              "parameters/body": {
+                                "__metadata": {
+                                  "type": "SP.Data.POUOpsEventsListItem"
+                                },
+                                "Title": "@concat(outputs('Compose_problem'), ': ', items('For_each_stock')?['StockKey'])",
+                                "EventKey": "@concat('RECON|', outputs('Compose_problem'), '|', items('For_each_stock')?['StockKey'])",
+                                "EventType": "RECONCILE",
+                                "Severity": "Critical",
+                                "Subject": "@concat(outputs('Compose_problem'), ': ', items('For_each_stock')?['StockKey'])",
+                                "Details": "@concat('On hand ', string(items('For_each_stock')?['OnHandQty']), ', stock version ', string(int(coalesce(items('For_each_stock')?['StockVersion'], 0))), '. Ledger row at that version: ', string(coalesce(first(body('Pick_current'))?['QtyAfter'], 'none')), '. Posting for this record is blocked until resolved (see docs/10_Maintenance.md).')",
+                                "FirstSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                "LastSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                "OccurrenceCount": 1,
+                                "Resolved": false
+                              }
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          },
+                          "runAfter": {}
+                        }
+                      }
+                    },
+                    "runAfter": {
+                      "Rec_Event_row": [
+                        "Succeeded"
+                      ]
+                    }
+                  }
+                },
+                "runAfter": {}
+              },
+              "Add_finding": {
+                "type": "AppendToArrayVariable",
+                "inputs": {
+                  "name": "vFindings",
+                  "value": {
+                    "severity": "Critical",
+                    "area": "Balance vs ledger",
+                    "item": "@items('For_each_stock')?['StockKey']",
+                    "detail": "@outputs('Compose_problem')"
+                  }
+                },
+                "runAfter": {
+                  "Rec_Ops_event": [
+                    "Succeeded",
+                    "Failed",
+                    "Skipped",
+                    "TimedOut"
+                  ]
+                }
+              }
+            },
+            "else": {
+              "actions": {}
+            },
+            "runAfter": {
+              "Compose_problem": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Compose_expected_flag": {
+            "type": "Compose",
+            "inputs": "@and(not(equals(items('For_each_stock')?['OnHandQty'], null)), not(equals(items('For_each_stock')?['MinQty'], null)), if(equals(outputs('Compose_Settings')?['LowStockRule'], 'LT'), less(coalesce(items('For_each_stock')?['OnHandQty'], 0), coalesce(items('For_each_stock')?['MinQty'], 0)), lessOrEquals(coalesce(items('For_each_stock')?['OnHandQty'], 0), coalesce(items('For_each_stock')?['MinQty'], 0))))",
+            "runAfter": {
+              "If_problem": [
+                "Succeeded",
+                "Failed",
+                "Skipped",
+                "TimedOut"
+              ]
+            }
+          },
+          "If_flag_wrong": {
+            "type": "If",
+            "expression": {
+              "equals": [
+                "@not(equals(coalesce(items('For_each_stock')?['LowStockFlag'], false), outputs('Compose_expected_flag')))",
+                true
+              ]
+            },
+            "actions": {
+              "Fix_flag": {
+                "type": "ApiConnection",
+                "inputs": {
+                  "host": {
+                    "connectionName": "shared_sharepointonline",
+                    "operationId": "HttpRequest",
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                  },
+                  "parameters": {
+                    "dataset": "@outputs('Cfg_SiteUrl')",
+                    "parameters/method": "POST",
+                    "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUStockLocations'')/items(', items('For_each_stock')?['Id'], ')')",
+                    "parameters/headers": {
+                      "Accept": "application/json;odata=verbose",
+                      "Content-Type": "application/json;odata=verbose",
+                      "X-HTTP-Method": "MERGE",
+                      "IF-MATCH": "@items('For_each_stock')?['__metadata']?['etag']"
+                    },
+                    "parameters/body": {
+                      "__metadata": {
+                        "type": "SP.Data.POUStockLocationsListItem"
+                      },
+                      "LowStockFlag": "@outputs('Compose_expected_flag')"
+                    }
+                  },
+                  "authentication": "@parameters('$authentication')"
+                },
+                "runAfter": {}
+              },
+              "If_flag_fixed": {
+                "type": "If",
+                "expression": {
+                  "equals": [
+                    "@equals(actions('Fix_flag')?['status'], 'Succeeded')",
+                    true
+                  ]
+                },
+                "actions": {
+                  "Count_fixed": {
+                    "type": "IncrementVariable",
+                    "inputs": {
+                      "name": "vFixed",
+                      "value": 1
+                    },
+                    "runAfter": {}
+                  }
+                },
+                "else": {
+                  "actions": {}
+                },
+                "runAfter": {
+                  "Fix_flag": [
+                    "Succeeded",
+                    "Failed",
+                    "Skipped",
+                    "TimedOut"
+                  ]
+                }
+              }
+            },
+            "else": {
+              "actions": {}
+            },
+            "runAfter": {
+              "Compose_expected_flag": [
+                "Succeeded"
+              ]
+            }
+          }
+        },
+        "runtimeConfiguration": {
+          "concurrency": {
+            "repetitions": 1
+          }
+        },
+        "runAfter": {
+          "Filter_rows_to_check": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Compose_req_cutoff": {
+        "type": "Compose",
+        "inputs": "@addDays(utcNow(), mul(-1, int(coalesce(outputs('Compose_Settings')?['RequestRetentionDays'], '90'))), 'yyyy-MM-ddTHH:mm:ssZ')",
+        "runAfter": {
+          "For_each_stock": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Compose_sess_cutoff": {
+        "type": "Compose",
+        "inputs": "@addDays(utcNow(), mul(-1, int(coalesce(outputs('Compose_Settings')?['SessionRetentionDays'], '30'))), 'yyyy-MM-ddTHH:mm:ssZ')",
+        "runAfter": {
+          "Compose_req_cutoff": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Get_old_requests": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connectionName": "shared_sharepointonline",
+            "operationId": "HttpRequest",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+          },
+          "parameters": {
+            "dataset": "@outputs('Cfg_SiteUrl')",
+            "parameters/method": "GET",
+            "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POURequests'')/items', '?', '$filter=', 'Created lt datetime''', outputs('Compose_req_cutoff'), ''' and IsOpen eq 0', '&', '$select=Id', '&', '$top=300')",
+            "parameters/headers": {
+              "Accept": "application/json;odata=verbose"
+            }
+          },
+          "authentication": "@parameters('$authentication')"
+        },
+        "runAfter": {
+          "Compose_sess_cutoff": [
+            "Succeeded"
+          ]
+        }
+      },
+      "For_each_old_request": {
+        "type": "Foreach",
+        "foreach": "@body('Get_old_requests')?['d']?['results']",
+        "actions": {
+          "Purge_request": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_sharepointonline",
+                "operationId": "HttpRequest",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+              },
+              "parameters": {
+                "dataset": "@outputs('Cfg_SiteUrl')",
+                "parameters/method": "POST",
+                "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POURequests'')/items(', items('For_each_old_request')?['Id'], ')')",
+                "parameters/headers": {
+                  "Accept": "application/json;odata=verbose",
+                  "Content-Type": "application/json;odata=verbose",
+                  "X-HTTP-Method": "DELETE",
+                  "IF-MATCH": "*"
+                }
+              },
+              "authentication": "@parameters('$authentication')"
+            },
+            "runAfter": {}
+          }
+        },
+        "runtimeConfiguration": {
+          "concurrency": {
+            "repetitions": 1
+          }
+        },
+        "runAfter": {
+          "Get_old_requests": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Get_old_sessions": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connectionName": "shared_sharepointonline",
+            "operationId": "HttpRequest",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+          },
+          "parameters": {
+            "dataset": "@outputs('Cfg_SiteUrl')",
+            "parameters/method": "GET",
+            "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSessions'')/items', '?', '$filter=', 'Created lt datetime''', outputs('Compose_sess_cutoff'), ''' and SessionState ne ''Active''', '&', '$select=Id', '&', '$top=300')",
+            "parameters/headers": {
+              "Accept": "application/json;odata=verbose"
+            }
+          },
+          "authentication": "@parameters('$authentication')"
+        },
+        "runAfter": {
+          "For_each_old_request": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "For_each_old_session": {
+        "type": "Foreach",
+        "foreach": "@body('Get_old_sessions')?['d']?['results']",
+        "actions": {
+          "Purge_session": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_sharepointonline",
+                "operationId": "HttpRequest",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+              },
+              "parameters": {
+                "dataset": "@outputs('Cfg_SiteUrl')",
+                "parameters/method": "POST",
+                "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSessions'')/items(', items('For_each_old_session')?['Id'], ')')",
+                "parameters/headers": {
+                  "Accept": "application/json;odata=verbose",
+                  "Content-Type": "application/json;odata=verbose",
+                  "X-HTTP-Method": "DELETE",
+                  "IF-MATCH": "*"
+                }
+              },
+              "authentication": "@parameters('$authentication')"
+            },
+            "runAfter": {}
+          }
+        },
+        "runtimeConfiguration": {
+          "concurrency": {
+            "repetitions": 1
+          }
+        },
+        "runAfter": {
+          "Get_old_sessions": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Table_findings": {
+        "type": "Table",
+        "inputs": {
+          "from": "@variables('vFindings')",
+          "format": "HTML",
+          "columns": [
+            {
+              "header": "Severity",
+              "value": "@item()?['severity']"
+            },
+            {
+              "header": "Area",
+              "value": "@item()?['area']"
+            },
+            {
+              "header": "Item",
+              "value": "@item()?['item']"
+            },
+            {
+              "header": "Detail",
+              "value": "@item()?['detail']"
+            }
+          ]
+        },
+        "runAfter": {
+          "For_each_old_session": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "If_any_findings": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@greater(length(variables('vFindings')), 0)",
+            true
+          ]
+        },
+        "actions": {
+          "Send_reconcile_email_if_recipients": {
+            "type": "If",
+            "expression": {
+              "equals": [
+                "@and(not(empty(coalesce(outputs('Compose_Settings')?['ReportRecipientsDataHealth'], ''))), not(contains(coalesce(outputs('Compose_Settings')?['ReportRecipientsDataHealth'], ''), 'CHANGE-ME')))",
+                true
+              ]
+            },
+            "actions": {
+              "Send_reconcile_email": {
+                "type": "ApiConnection",
+                "inputs": {
+                  "host": {
+                    "connectionName": "shared_office365",
+                    "operationId": "SendEmailV2",
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                  },
+                  "parameters": {
+                    "emailMessage/To": "@replace(coalesce(outputs('Compose_Settings')?['ReportRecipientsDataHealth'], ''), ',', ';')",
+                    "emailMessage/Subject": "@concat('POU reconciliation ', outputs('Compose_LocalDate'), ': ', string(length(variables('vFindings'))), ' problem(s)')",
+                    "emailMessage/Body": "@concat('<html><body style=''font-family:Segoe UI,Arial,sans-serif;font-size:13px''><h3>POU nightly reconciliation</h3><p>These stock records do not match their ledger. Posting is blocked for them until fixed.</p>', '<h4>Findings</h4>', body('Table_findings'), '<p style=\"color:#555\">Checked rows: see POUOpsEvents for history. Never edit OnHandQty directly: post an ADJUSTMENT or AUDIT.</p></body></html>')",
+                    "emailMessage/Importance": "Normal"
+                  },
+                  "authentication": "@parameters('$authentication')"
+                },
+                "runAfter": {}
+              }
+            },
+            "else": {
+              "actions": {}
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Table_findings": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Find_setting_LastReconcileDate": {
+        "type": "Query",
+        "inputs": {
+          "from": "@body('Get_settings')?['d']?['results']",
+          "where": "@equals(item()?['SettingKey'], 'LastReconcileDate')"
+        },
+        "runAfter": {
+          "If_any_findings": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Save_setting_LastReconcileDate": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connectionName": "shared_sharepointonline",
+            "operationId": "HttpRequest",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+          },
+          "parameters": {
+            "dataset": "@outputs('Cfg_SiteUrl')",
+            "parameters/method": "POST",
+            "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSettings'')/items(', first(body('Find_setting_LastReconcileDate'))?['Id'], ')')",
+            "parameters/headers": {
+              "Accept": "application/json;odata=verbose",
+              "Content-Type": "application/json;odata=verbose",
+              "X-HTTP-Method": "MERGE",
+              "IF-MATCH": "*"
+            },
+            "parameters/body": {
+              "__metadata": {
+                "type": "SP.Data.POUSettingsListItem"
+              },
+              "SettingValue": "@outputs('Compose_LocalDate')"
+            }
+          },
+          "authentication": "@parameters('$authentication')"
+        },
+        "runAfter": {
+          "Find_setting_LastReconcileDate": [
+            "Succeeded"
+          ]
+        }
+      }
+    }
+  }
+}

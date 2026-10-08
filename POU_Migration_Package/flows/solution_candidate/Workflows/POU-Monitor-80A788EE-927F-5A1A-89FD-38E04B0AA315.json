@@ -1,0 +1,722 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_sharepointonline": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "pou_sharedsharepointonline_pou"
+        },
+        "api": {
+          "name": "shared_sharepointonline"
+        }
+      },
+      "shared_office365": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "pou_sharedoffice365_pou"
+        },
+        "api": {
+          "name": "shared_office365"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "Recurrence": {
+          "type": "Recurrence",
+          "recurrence": {
+            "frequency": "Hour",
+            "interval": 1
+          },
+          "metadata": {
+            "operationMetadataId": "00000000-0000-0000-0000-000000000000"
+          }
+        }
+      },
+      "actions": {
+        "Cfg_SiteUrl": {
+          "type": "Compose",
+          "inputs": "https://CHANGE-ME.sharepoint.com/sites/POU",
+          "runAfter": {}
+        },
+        "Guard_site_url_configured": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@contains(outputs('Cfg_SiteUrl'), 'CHANGE-ME')",
+              true
+            ]
+          },
+          "actions": {
+            "Stop_site_url_not_set": {
+              "type": "Terminate",
+              "inputs": {
+                "runStatus": "Failed",
+                "runError": {
+                  "code": "POU_CONFIG",
+                  "message": "Edit the Cfg_SiteUrl action: it still contains CHANGE-ME."
+                }
+              },
+              "runAfter": {}
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "runAfter": {
+            "Cfg_SiteUrl": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Probe_problem_requests": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_sharepointonline",
+              "operationId": "HttpRequest",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+            },
+            "parameters": {
+              "dataset": "@outputs('Cfg_SiteUrl')",
+              "parameters/method": "GET",
+              "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POURequests'')/items', '?', '$filter=', 'RequestStatus eq ''Failed'' or RequestStatus eq ''Pending'' or RequestStatus eq ''Processing'' or RequestStatus eq ''AwaitingSupervisor''', '&', '$select=Id,RequestID,RequestType,RequestStatus,Created,ClaimedUtc,ResultCode,InventoryEffect,StockKey', '&', '$top=200')",
+              "parameters/headers": {
+                "Accept": "application/json;odata=verbose"
+              }
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "Guard_site_url_configured": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "Probe_open_intents": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_sharepointonline",
+              "operationId": "HttpRequest",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+            },
+            "parameters": {
+              "dataset": "@outputs('Cfg_SiteUrl')",
+              "parameters/method": "GET",
+              "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POULedger'')/items', '?', '$filter=', 'PostingState eq ''Intent''', '&', '$select=LedgerKey,RequestID,StockKey,Created', '&', '$top=100')",
+              "parameters/headers": {
+                "Accept": "application/json;odata=verbose"
+              }
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "Probe_problem_requests": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_nothing": {
+          "type": "Compose",
+          "inputs": "@and(empty(body('Probe_problem_requests')?['d']?['results']), empty(body('Probe_open_intents')?['d']?['results']))",
+          "runAfter": {
+            "Probe_open_intents": [
+              "Succeeded"
+            ]
+          }
+        },
+        "If_nothing_to_report": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@equals(outputs('Compose_nothing'), true)",
+              true
+            ]
+          },
+          "actions": {
+            "Stop_all_clear": {
+              "type": "Terminate",
+              "inputs": {
+                "runStatus": "Succeeded"
+              },
+              "runAfter": {}
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "runAfter": {
+            "Compose_nothing": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Get_settings": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_sharepointonline",
+              "operationId": "HttpRequest",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+            },
+            "parameters": {
+              "dataset": "@outputs('Cfg_SiteUrl')",
+              "parameters/method": "GET",
+              "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSettings'')/items', '?', '$select=Id,SettingKey,SettingValue', '&', '$top=500')",
+              "parameters/headers": {
+                "Accept": "application/json;odata=verbose"
+              }
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "If_nothing_to_report": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "Select_settings": {
+          "type": "Select",
+          "inputs": {
+            "from": "@body('Get_settings')?['d']?['results']",
+            "select": "@concat('\"', item()?['SettingKey'], '\":\"', replace(replace(coalesce(item()?['SettingValue'], ''), '\"', ''), '\\', '/'), '\"')"
+          },
+          "runAfter": {
+            "Get_settings": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_Settings": {
+          "type": "Compose",
+          "inputs": "@json(concat('{', join(body('Select_settings'), ','), '}'))",
+          "runAfter": {
+            "Select_settings": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Init_vNew": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vNew",
+                "type": "array",
+                "value": []
+              }
+            ]
+          },
+          "runAfter": {
+            "Compose_Settings": [
+              "Succeeded"
+            ]
+          }
+        },
+        "For_each_problem_request": {
+          "type": "Foreach",
+          "foreach": "@body('Probe_problem_requests')?['d']?['results']",
+          "actions": {
+            "Compose_class": {
+              "type": "Compose",
+              "inputs": "@if(equals(items('For_each_problem_request')?['RequestStatus'], 'Failed'), 'FAILED', if(and(equals(items('For_each_problem_request')?['RequestStatus'], 'AwaitingSupervisor'), greater(sub(ticks(utcNow()), ticks(items('For_each_problem_request')?['Created'])), 288000000000)), 'WAITING_APPROVAL', if(and(or(equals(items('For_each_problem_request')?['RequestStatus'], 'Pending'), equals(items('For_each_problem_request')?['RequestStatus'], 'Processing')), greater(sub(ticks(utcNow()), ticks(items('For_each_problem_request')?['Created'])), 9000000000)), 'STUCK', '')))",
+              "runAfter": {}
+            },
+            "If_reportable": {
+              "type": "If",
+              "expression": {
+                "equals": [
+                  "@not(empty(outputs('Compose_class')))",
+                  true
+                ]
+              },
+              "actions": {
+                "Req_Once": {
+                  "type": "Scope",
+                  "actions": {
+                    "Req_Get_event": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_sharepointonline",
+                          "operationId": "HttpRequest",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                        },
+                        "parameters": {
+                          "dataset": "@outputs('Cfg_SiteUrl')",
+                          "parameters/method": "GET",
+                          "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUOpsEvents'')/items', '?', '$filter=', 'EventKey eq ''', uriComponent(replace(string(concat(outputs('Compose_class'), '|', items('For_each_problem_request')?['RequestID'])), '''', '''''')), '''', '&', '$select=Id', '&', '$top=2')",
+                          "parameters/headers": {
+                            "Accept": "application/json;odata=verbose"
+                          }
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      },
+                      "runAfter": {}
+                    },
+                    "Req_Event_is_new": {
+                      "type": "If",
+                      "expression": {
+                        "equals": [
+                          "@empty(body('Req_Get_event')?['d']?['results'])",
+                          true
+                        ]
+                      },
+                      "actions": {
+                        "Req_Create_event": {
+                          "type": "ApiConnection",
+                          "inputs": {
+                            "host": {
+                              "connectionName": "shared_sharepointonline",
+                              "operationId": "HttpRequest",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                            },
+                            "parameters": {
+                              "dataset": "@outputs('Cfg_SiteUrl')",
+                              "parameters/method": "POST",
+                              "parameters/uri": "/_api/web/lists/getbytitle('POUOpsEvents')/items",
+                              "parameters/headers": {
+                                "Accept": "application/json;odata=verbose",
+                                "Content-Type": "application/json;odata=verbose"
+                              },
+                              "parameters/body": {
+                                "__metadata": {
+                                  "type": "SP.Data.POUOpsEventsListItem"
+                                },
+                                "Title": "@concat(outputs('Compose_class'), ' request ', items('For_each_problem_request')?['RequestType'], ' ', string(coalesce(items('For_each_problem_request')?['StockKey'], '')))",
+                                "EventKey": "@concat(outputs('Compose_class'), '|', items('For_each_problem_request')?['RequestID'])",
+                                "EventType": "@concat('REQUEST_', outputs('Compose_class'))",
+                                "Severity": "@if(equals(items('For_each_problem_request')?['InventoryEffect'], 'Unknown'), 'Critical', if(equals(outputs('Compose_class'), 'FAILED'), 'Warning', 'Warning'))",
+                                "Subject": "@concat(outputs('Compose_class'), ' request ', items('For_each_problem_request')?['RequestType'], ' ', string(coalesce(items('For_each_problem_request')?['StockKey'], '')))",
+                                "Details": "@concat('RequestID ', items('For_each_problem_request')?['RequestID'], ' status ', items('For_each_problem_request')?['RequestStatus'], ' result ', string(coalesce(items('For_each_problem_request')?['ResultCode'], '')), ' effect ', string(coalesce(items('For_each_problem_request')?['InventoryEffect'], '(none yet)')), '. Created ', items('For_each_problem_request')?['Created'], '.')",
+                                "FirstSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                "LastSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                "OccurrenceCount": 1,
+                                "Resolved": false
+                              }
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          },
+                          "runAfter": {}
+                        },
+                        "Req_Remember": {
+                          "type": "AppendToArrayVariable",
+                          "inputs": {
+                            "name": "vNew",
+                            "value": {
+                              "severity": "@if(equals(items('For_each_problem_request')?['InventoryEffect'], 'Unknown'), 'Critical', if(equals(outputs('Compose_class'), 'FAILED'), 'Warning', 'Warning'))",
+                              "type": "@concat('REQUEST_', outputs('Compose_class'))",
+                              "subject": "@concat(outputs('Compose_class'), ' request ', items('For_each_problem_request')?['RequestType'], ' ', string(coalesce(items('For_each_problem_request')?['StockKey'], '')))",
+                              "details": "@concat('RequestID ', items('For_each_problem_request')?['RequestID'], ' status ', items('For_each_problem_request')?['RequestStatus'], ' result ', string(coalesce(items('For_each_problem_request')?['ResultCode'], '')), ' effect ', string(coalesce(items('For_each_problem_request')?['InventoryEffect'], '(none yet)')), '. Created ', items('For_each_problem_request')?['Created'], '.')"
+                            }
+                          },
+                          "runAfter": {
+                            "Req_Create_event": [
+                              "Succeeded"
+                            ]
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {}
+                      },
+                      "runAfter": {
+                        "Req_Get_event": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "Compose_class": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "runtimeConfiguration": {
+            "concurrency": {
+              "repetitions": 1
+            }
+          },
+          "runAfter": {
+            "Init_vNew": [
+              "Succeeded"
+            ]
+          }
+        },
+        "For_each_open_intent": {
+          "type": "Foreach",
+          "foreach": "@body('Probe_open_intents')?['d']?['results']",
+          "actions": {
+            "If_intent_old": {
+              "type": "If",
+              "expression": {
+                "equals": [
+                  "@greater(sub(ticks(utcNow()), ticks(items('For_each_open_intent')?['Created'])), 9000000000)",
+                  true
+                ]
+              },
+              "actions": {
+                "Int_Once": {
+                  "type": "Scope",
+                  "actions": {
+                    "Int_Get_event": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_sharepointonline",
+                          "operationId": "HttpRequest",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                        },
+                        "parameters": {
+                          "dataset": "@outputs('Cfg_SiteUrl')",
+                          "parameters/method": "GET",
+                          "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUOpsEvents'')/items', '?', '$filter=', 'EventKey eq ''', uriComponent(replace(string(concat('INTENT|', items('For_each_open_intent')?['LedgerKey'])), '''', '''''')), '''', '&', '$select=Id', '&', '$top=2')",
+                          "parameters/headers": {
+                            "Accept": "application/json;odata=verbose"
+                          }
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      },
+                      "runAfter": {}
+                    },
+                    "Int_Event_is_new": {
+                      "type": "If",
+                      "expression": {
+                        "equals": [
+                          "@empty(body('Int_Get_event')?['d']?['results'])",
+                          true
+                        ]
+                      },
+                      "actions": {
+                        "Int_Create_event": {
+                          "type": "ApiConnection",
+                          "inputs": {
+                            "host": {
+                              "connectionName": "shared_sharepointonline",
+                              "operationId": "HttpRequest",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                            },
+                            "parameters": {
+                              "dataset": "@outputs('Cfg_SiteUrl')",
+                              "parameters/method": "POST",
+                              "parameters/uri": "/_api/web/lists/getbytitle('POUOpsEvents')/items",
+                              "parameters/headers": {
+                                "Accept": "application/json;odata=verbose",
+                                "Content-Type": "application/json;odata=verbose"
+                              },
+                              "parameters/body": {
+                                "__metadata": {
+                                  "type": "SP.Data.POUOpsEventsListItem"
+                                },
+                                "Title": "@concat('Ledger intent not completed: ', items('For_each_open_intent')?['LedgerKey'])",
+                                "EventKey": "@concat('INTENT|', items('For_each_open_intent')?['LedgerKey'])",
+                                "EventType": "LEDGER_INTENT_STUCK",
+                                "Severity": "Critical",
+                                "Subject": "@concat('Ledger intent not completed: ', items('For_each_open_intent')?['LedgerKey'])",
+                                "Details": "@concat('Intent ', items('For_each_open_intent')?['LedgerKey'], ' for request ', items('For_each_open_intent')?['RequestID'], ' has been open since ', items('For_each_open_intent')?['Created'], '. The sweeper should have finished it.')",
+                                "FirstSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                "LastSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                "OccurrenceCount": 1,
+                                "Resolved": false
+                              }
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          },
+                          "runAfter": {}
+                        },
+                        "Int_Remember": {
+                          "type": "AppendToArrayVariable",
+                          "inputs": {
+                            "name": "vNew",
+                            "value": {
+                              "severity": "Critical",
+                              "type": "LEDGER_INTENT_STUCK",
+                              "subject": "@concat('Ledger intent not completed: ', items('For_each_open_intent')?['LedgerKey'])",
+                              "details": "@concat('Intent ', items('For_each_open_intent')?['LedgerKey'], ' for request ', items('For_each_open_intent')?['RequestID'], ' has been open since ', items('For_each_open_intent')?['Created'], '. The sweeper should have finished it.')"
+                            }
+                          },
+                          "runAfter": {
+                            "Int_Create_event": [
+                              "Succeeded"
+                            ]
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {}
+                      },
+                      "runAfter": {
+                        "Int_Get_event": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {}
+            }
+          },
+          "runtimeConfiguration": {
+            "concurrency": {
+              "repetitions": 1
+            }
+          },
+          "runAfter": {
+            "For_each_problem_request": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "Table_new": {
+          "type": "Table",
+          "inputs": {
+            "from": "@variables('vNew')",
+            "format": "HTML",
+            "columns": [
+              {
+                "header": "Severity",
+                "value": "@item()?['severity']"
+              },
+              {
+                "header": "Type",
+                "value": "@item()?['type']"
+              },
+              {
+                "header": "What",
+                "value": "@item()?['subject']"
+              },
+              {
+                "header": "Details",
+                "value": "@item()?['details']"
+              }
+            ]
+          },
+          "runAfter": {
+            "For_each_open_intent": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "If_any_new": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@greater(length(variables('vNew')), 0)",
+              true
+            ]
+          },
+          "actions": {
+            "Send_ops_email_if_recipients": {
+              "type": "If",
+              "expression": {
+                "equals": [
+                  "@and(not(empty(coalesce(outputs('Compose_Settings')?['ReportRecipientsOps'], ''))), not(contains(coalesce(outputs('Compose_Settings')?['ReportRecipientsOps'], ''), 'CHANGE-ME')))",
+                  true
+                ]
+              },
+              "actions": {
+                "Send_ops_email": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_office365",
+                      "operationId": "SendEmailV2",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                    },
+                    "parameters": {
+                      "emailMessage/To": "@replace(coalesce(outputs('Compose_Settings')?['ReportRecipientsOps'], ''), ',', ';')",
+                      "emailMessage/Subject": "@concat('POU ALERT: ', string(length(variables('vNew'))), ' new failed/stuck item(s)')",
+                      "emailMessage/Body": "@concat('<html><body style=''font-family:Segoe UI,Arial,sans-serif;font-size:13px''><h3>POU failed / stuck requests</h3><p>Each item below was newly detected. Inventory Effect = Applied means the quantity DID change.</p>', '<h4>New findings</h4>', body('Table_new'), '<p style=\"color:#555\">Resolve in the POUOpsEvents list (tick Resolved). See docs/10_Maintenance.md for each EventType.</p></body></html>')",
+                      "emailMessage/Importance": "Normal"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {
+                  "NoRcptOps_Ops_event": {
+                    "type": "Scope",
+                    "actions": {
+                      "NoRcptOps_Get_event": {
+                        "type": "ApiConnection",
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_sharepointonline",
+                            "operationId": "HttpRequest",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                          },
+                          "parameters": {
+                            "dataset": "@outputs('Cfg_SiteUrl')",
+                            "parameters/method": "GET",
+                            "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUOpsEvents'')/items', '?', '$filter=', 'EventKey eq ''', uriComponent(replace(string('REPORT_RECIPIENTS_OPS'), '''', '''''')), '''', '&', '$select=Id,OccurrenceCount', '&', '$top=2')",
+                            "parameters/headers": {
+                              "Accept": "application/json;odata=verbose"
+                            }
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        },
+                        "runAfter": {}
+                      },
+                      "NoRcptOps_Event_row": {
+                        "type": "Compose",
+                        "inputs": "@first(body('NoRcptOps_Get_event')?['d']?['results'])",
+                        "runAfter": {
+                          "NoRcptOps_Get_event": [
+                            "Succeeded"
+                          ]
+                        }
+                      },
+                      "NoRcptOps_Event_exists": {
+                        "type": "If",
+                        "expression": {
+                          "equals": [
+                            "@not(equals(outputs('NoRcptOps_Event_row'), null))",
+                            true
+                          ]
+                        },
+                        "actions": {
+                          "NoRcptOps_Update_event": {
+                            "type": "ApiConnection",
+                            "inputs": {
+                              "host": {
+                                "connectionName": "shared_sharepointonline",
+                                "operationId": "HttpRequest",
+                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                              },
+                              "parameters": {
+                                "dataset": "@outputs('Cfg_SiteUrl')",
+                                "parameters/method": "POST",
+                                "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUOpsEvents'')/items(', outputs('NoRcptOps_Event_row')?['Id'], ')')",
+                                "parameters/headers": {
+                                  "Accept": "application/json;odata=verbose",
+                                  "Content-Type": "application/json;odata=verbose",
+                                  "X-HTTP-Method": "MERGE",
+                                  "IF-MATCH": "*"
+                                },
+                                "parameters/body": {
+                                  "__metadata": {
+                                    "type": "SP.Data.POUOpsEventsListItem"
+                                  },
+                                  "LastSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                  "OccurrenceCount": "@add(int(coalesce(outputs('NoRcptOps_Event_row')?['OccurrenceCount'], 1)), 1)",
+                                  "Details": "Setting ReportRecipientsOps is empty or still CHANGE-ME@... so failed/stuck alerts are only visible in POUOpsEvents.",
+                                  "Resolved": false
+                                }
+                              },
+                              "authentication": "@parameters('$authentication')"
+                            },
+                            "runAfter": {}
+                          }
+                        },
+                        "else": {
+                          "actions": {
+                            "NoRcptOps_Create_event": {
+                              "type": "ApiConnection",
+                              "inputs": {
+                                "host": {
+                                  "connectionName": "shared_sharepointonline",
+                                  "operationId": "HttpRequest",
+                                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                                },
+                                "parameters": {
+                                  "dataset": "@outputs('Cfg_SiteUrl')",
+                                  "parameters/method": "POST",
+                                  "parameters/uri": "/_api/web/lists/getbytitle('POUOpsEvents')/items",
+                                  "parameters/headers": {
+                                    "Accept": "application/json;odata=verbose",
+                                    "Content-Type": "application/json;odata=verbose"
+                                  },
+                                  "parameters/body": {
+                                    "__metadata": {
+                                      "type": "SP.Data.POUOpsEventsListItem"
+                                    },
+                                    "Title": "Ops alert recipients not configured",
+                                    "EventKey": "REPORT_RECIPIENTS_OPS",
+                                    "EventType": "CONFIG",
+                                    "Severity": "Warning",
+                                    "Subject": "Ops alert recipients not configured",
+                                    "Details": "Setting ReportRecipientsOps is empty or still CHANGE-ME@... so failed/stuck alerts are only visible in POUOpsEvents.",
+                                    "FirstSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                    "LastSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                    "OccurrenceCount": 1,
+                                    "Resolved": false
+                                  }
+                                },
+                                "authentication": "@parameters('$authentication')"
+                              },
+                              "runAfter": {}
+                            }
+                          }
+                        },
+                        "runAfter": {
+                          "NoRcptOps_Event_row": [
+                            "Succeeded"
+                          ]
+                        }
+                      }
+                    },
+                    "runAfter": {}
+                  }
+                }
+              },
+              "runAfter": {}
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "runAfter": {
+            "Table_new": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        }
+      }
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}

@@ -167,7 +167,9 @@ class SpClient:
                 n += 1
                 if max_items and n >= max_items:
                     return
-            url = d.get("__next")
+            nxt = d.get("__next")
+            # follow the link relative to OUR site url (same host/casing as the one we authenticated against)
+            url = nxt[nxt.lower().index("/_api/") + len("/_api/"):] if nxt else None
 
     def get_by_key(self, title: str, field: str, value: str, select: str | None = None) -> dict | None:
         rows = list(self.query(title, f"{field} eq '{odata_str(value)}'", select, top=2))

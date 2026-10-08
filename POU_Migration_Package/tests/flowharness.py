@@ -8,7 +8,7 @@ import uuid
 
 from flowlab.connectors import FaultPlan, MailBackend, SpBackend
 from flowlab.runtime import Clock, FlowKilled, Runtime
-from pou_flows import process, session
+from pou_flows import process, session, sweeper, reports
 
 SITE = "https://fake.sharepoint.com/sites/POU"
 SVC = "svc@test"
@@ -22,14 +22,16 @@ class Env:
         self.clock = Clock()
         fake.clock = self.clock
         self.mail = MailBackend()
-        self.flows = {"process": process.build(SITE), "session": session.build(SITE)}
+        self.flows = {"process": process.build(SITE), "session": session.build(SITE), "sweeper": sweeper.build(SITE),
+                      "lowstock": reports.build_lowstock(SITE), "reconcile": reports.build_reconcile(SITE), "health": reports.build_health(SITE),
+                      "usage": reports.build_usage(SITE), "monitor": reports.build_monitor(SITE)}
         self.clients = clients      # callable upn -> SpClient
         self.rng = random.Random(12345)   # ONE shared generator so guid() is unique across runs, as in production
 
     def c(self, upn):
         return self.clients(upn)
 
-    def run(self, flow, inputs, caller="station1@test", plan=None, clock=None, header=True, svc=SVC, rng=None, mail=None):
+    def run(self, flow, inputs, caller="station1@test", plan=None, clock=None, header=True, svc=SVC, rng=None, mail=None, max_actions=None):
         d = flow.definition() if hasattr(flow, "definition") else flow
         trig = {("text" if i == 0 else f"text_{i}"): x for i, x in enumerate(inputs)}
         hdr = {"x-ms-user-email-encoded": base64.b64encode(caller.encode()).decode()} if header else {}
@@ -37,6 +39,8 @@ class Env:
         rt = Runtime(d, trigger_body=trig, trigger_headers=hdr,
                      connectors={"shared_sharepointonline": sp, "shared_office365": mail or self.mail},
                      clock=clock or self.clock, rng=rng or self.rng)
+        if max_actions:
+            rt.max_actions = max_actions
         try:
             rt.run()
         except FlowKilled as k:
@@ -59,6 +63,20 @@ class Env:
     def process(self, rid, caller="station1@test", **kw):
         rt = self.run(self.flows["process"], [rid], caller=caller, **kw)
         return rt
+
+    def job(self, name, **kw):
+        return self.run(self.flows[name], [], caller=SVC, **kw)
+
+    def setting(self, key, value):
+        o = self.c("owner@test")
+        row = o.get_by_key("POUSettings", "SettingKey", key)
+        o.update_item("POUSettings", row["Id"], {"SettingValue": value})
+
+    def get_setting(self, key):
+        return self.c("owner@test").get_by_key("POUSettings", "SettingKey", key)["SettingValue"]
+
+    def sweep(self, **kw):
+        return self.run(self.flows["sweeper"], [], caller=SVC, **kw)
 
     def req(self, rid):
         return self.c("owner@test").get_by_key("POURequests", "RequestID", rid)

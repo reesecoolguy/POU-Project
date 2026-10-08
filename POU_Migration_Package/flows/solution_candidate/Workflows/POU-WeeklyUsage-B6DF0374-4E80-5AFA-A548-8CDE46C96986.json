@@ -1,0 +1,728 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_sharepointonline": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "pou_sharedsharepointonline_pou"
+        },
+        "api": {
+          "name": "shared_sharepointonline"
+        }
+      },
+      "shared_office365": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "pou_sharedoffice365_pou"
+        },
+        "api": {
+          "name": "shared_office365"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "Recurrence": {
+          "type": "Recurrence",
+          "recurrence": {
+            "frequency": "Hour",
+            "interval": 1
+          },
+          "metadata": {
+            "operationMetadataId": "00000000-0000-0000-0000-000000000000"
+          }
+        }
+      },
+      "actions": {
+        "Cfg_SiteUrl": {
+          "type": "Compose",
+          "inputs": "https://CHANGE-ME.sharepoint.com/sites/POU",
+          "runAfter": {}
+        },
+        "Guard_site_url_configured": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@contains(outputs('Cfg_SiteUrl'), 'CHANGE-ME')",
+              true
+            ]
+          },
+          "actions": {
+            "Stop_site_url_not_set": {
+              "type": "Terminate",
+              "inputs": {
+                "runStatus": "Failed",
+                "runError": {
+                  "code": "POU_CONFIG",
+                  "message": "Edit the Cfg_SiteUrl action: it still contains CHANGE-ME."
+                }
+              },
+              "runAfter": {}
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "runAfter": {
+            "Cfg_SiteUrl": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Get_settings": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_sharepointonline",
+              "operationId": "HttpRequest",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+            },
+            "parameters": {
+              "dataset": "@outputs('Cfg_SiteUrl')",
+              "parameters/method": "GET",
+              "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSettings'')/items', '?', '$select=Id,SettingKey,SettingValue', '&', '$top=500')",
+              "parameters/headers": {
+                "Accept": "application/json;odata=verbose"
+              }
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "Guard_site_url_configured": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "Select_settings": {
+          "type": "Select",
+          "inputs": {
+            "from": "@body('Get_settings')?['d']?['results']",
+            "select": "@concat('\"', item()?['SettingKey'], '\":\"', replace(replace(coalesce(item()?['SettingValue'], ''), '\"', ''), '\\', '/'), '\"')"
+          },
+          "runAfter": {
+            "Get_settings": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_Settings": {
+          "type": "Compose",
+          "inputs": "@json(concat('{', join(body('Select_settings'), ','), '}'))",
+          "runAfter": {
+            "Select_settings": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_LocalDate": {
+          "type": "Compose",
+          "inputs": "@convertFromUtc(utcNow(), coalesce(outputs('Compose_Settings')?['DisplayTimeZoneWindows'], 'Central Standard Time'), 'yyyy-MM-dd')",
+          "runAfter": {
+            "Compose_Settings": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_LocalHour": {
+          "type": "Compose",
+          "inputs": "@int(convertFromUtc(utcNow(), coalesce(outputs('Compose_Settings')?['DisplayTimeZoneWindows'], 'Central Standard Time'), 'HH'))",
+          "runAfter": {
+            "Compose_LocalDate": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_LocalDow": {
+          "type": "Compose",
+          "inputs": "@toLower(convertFromUtc(utcNow(), coalesce(outputs('Compose_Settings')?['DisplayTimeZoneWindows'], 'Central Standard Time'), 'dddd'))",
+          "runAfter": {
+            "Compose_LocalHour": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_Due": {
+          "type": "Compose",
+          "inputs": "@and(and(greaterOrEquals(outputs('Compose_LocalHour'), int(coalesce(outputs('Compose_Settings')?['WeeklyHourLocal'], '7'))), not(equals(coalesce(outputs('Compose_Settings')?['LastWeeklyUsageDate'], ''), outputs('Compose_LocalDate')))), equals(outputs('Compose_LocalDow'), toLower(coalesce(outputs('Compose_Settings')?['WeeklyDayOfWeek'], 'monday'))))",
+          "runAfter": {
+            "Compose_LocalDow": [
+              "Succeeded"
+            ]
+          }
+        },
+        "If_not_due": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@equals(outputs('Compose_Due'), false)",
+              true
+            ]
+          },
+          "actions": {
+            "Stop_not_due": {
+              "type": "Terminate",
+              "inputs": {
+                "runStatus": "Succeeded"
+              },
+              "runAfter": {}
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "runAfter": {
+            "Compose_Due": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Init_vStock": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vStock",
+                "type": "array",
+                "value": []
+              }
+            ]
+          },
+          "runAfter": {
+            "If_not_due": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "Init_vStockNext": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vStockNext",
+                "type": "string",
+                "value": ""
+              }
+            ]
+          },
+          "runAfter": {
+            "Init_vStock": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Init_vUsage": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vUsage",
+                "type": "array",
+                "value": []
+              }
+            ]
+          },
+          "runAfter": {
+            "Init_vStockNext": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Stock_reset_rows": {
+          "type": "SetVariable",
+          "inputs": {
+            "name": "vStock",
+            "value": []
+          },
+          "runAfter": {
+            "Init_vUsage": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Stock_first_uri": {
+          "type": "SetVariable",
+          "inputs": {
+            "name": "vStockNext",
+            "value": "@concat('/_api/web/lists/getbytitle(''POUStockLocations'')/items?$top=500&$select=StockKey,ItemID,ItemName,LocationCode,OnHandQty,MinQty,MaxQty,Active')"
+          },
+          "runAfter": {
+            "Stock_reset_rows": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Stock_until": {
+          "type": "Until",
+          "expression": "@empty(variables('vStockNext'))",
+          "limit": {
+            "count": 100,
+            "timeout": "PT1H"
+          },
+          "actions": {
+            "Stock_page": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "HttpRequest",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@outputs('Cfg_SiteUrl')",
+                  "parameters/method": "GET",
+                  "parameters/uri": "@variables('vStockNext')",
+                  "parameters/headers": {
+                    "Accept": "application/json;odata=verbose"
+                  }
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "Stock_append": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": "vStock",
+                "value": "@union(variables('vStock'), coalesce(body('Stock_page')?['d']?['results'], createArray()))"
+              },
+              "runAfter": {
+                "Stock_page": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Stock_next": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": "vStockNext",
+                "value": "@if(empty(coalesce(body('Stock_page')?['d']?['__next'], '')), '', substring(body('Stock_page')?['d']?['__next'], indexOf(body('Stock_page')?['d']?['__next'], '/_api/')))"
+              },
+              "runAfter": {
+                "Stock_append": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "runAfter": {
+            "Stock_first_uri": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Filter_active_stock": {
+          "type": "Query",
+          "inputs": {
+            "from": "@variables('vStock')",
+            "where": "@equals(item()?['Active'], true)"
+          },
+          "runAfter": {
+            "Stock_until": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "Compose_d30": {
+          "type": "Compose",
+          "inputs": "@addDays(utcNow(), -30, 'yyyy-MM-ddTHH:mm:ssZ')",
+          "runAfter": {
+            "Filter_active_stock": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_d90": {
+          "type": "Compose",
+          "inputs": "@addDays(utcNow(), -90, 'yyyy-MM-ddTHH:mm:ssZ')",
+          "runAfter": {
+            "Compose_d30": [
+              "Succeeded"
+            ]
+          }
+        },
+        "For_each_usage_stock": {
+          "type": "Foreach",
+          "foreach": "@body('Filter_active_stock')",
+          "actions": {
+            "Get_issues90": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "HttpRequest",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@outputs('Cfg_SiteUrl')",
+                  "parameters/method": "GET",
+                  "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POULedger'')/items', '?', '$filter=', 'StockKey eq ''', uriComponent(replace(string(items('For_each_usage_stock')?['StockKey']), '''', '''''')), ''' and LedgerType eq ''ISSUE'' and PostingState eq ''Posted'' and OccurredUtc ge datetime''', outputs('Compose_d90'), '''', '&', '$select=QtyDelta,OccurredUtc,Origin', '&', '$top=500')",
+                  "parameters/headers": {
+                    "Accept": "application/json;odata=verbose"
+                  }
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "Compose_rows90": {
+              "type": "Compose",
+              "inputs": "@body('Get_issues90')?['d']?['results']",
+              "runAfter": {
+                "Get_issues90": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Filter_rows90": {
+              "type": "Query",
+              "inputs": {
+                "from": "@outputs('Compose_rows90')",
+                "where": "@or(equals(toLower(coalesce(outputs('Compose_Settings')?['UsageIncludeLegacy'], 'true')), 'true'), equals(item()?['Origin'], 'Live'))"
+              },
+              "runAfter": {
+                "Compose_rows90": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Filter_rows30": {
+              "type": "Query",
+              "inputs": {
+                "from": "@body('Filter_rows90')",
+                "where": "@greaterOrEquals(item()?['OccurredUtc'], outputs('Compose_d30'))"
+              },
+              "runAfter": {
+                "Filter_rows90": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Select_q90": {
+              "type": "Select",
+              "inputs": {
+                "from": "@body('Filter_rows90')",
+                "select": "@sub(0, int(coalesce(item()?['QtyDelta'], 0)))"
+              },
+              "runAfter": {
+                "Filter_rows30": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Select_q30": {
+              "type": "Select",
+              "inputs": {
+                "from": "@body('Filter_rows30')",
+                "select": "@sub(0, int(coalesce(item()?['QtyDelta'], 0)))"
+              },
+              "runAfter": {
+                "Select_q90": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Compose_sum90": {
+              "type": "Compose",
+              "inputs": "@xpath(xml(json(concat('{\"r\":{\"q\":', string(body('Select_q90')), '}}'))), 'sum(//q)')",
+              "runAfter": {
+                "Select_q30": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Compose_sum30": {
+              "type": "Compose",
+              "inputs": "@xpath(xml(json(concat('{\"r\":{\"q\":', string(body('Select_q30')), '}}'))), 'sum(//q)')",
+              "runAfter": {
+                "Compose_sum90": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Compose_usage_row": {
+              "type": "Compose",
+              "inputs": {
+                "stockKey": "@items('For_each_usage_stock')?['StockKey']",
+                "item": "@items('For_each_usage_stock')?['ItemID']",
+                "name": "@coalesce(items('For_each_usage_stock')?['ItemName'], '')",
+                "location": "@items('For_each_usage_stock')?['LocationCode']",
+                "onHand": "@items('For_each_usage_stock')?['OnHandQty']",
+                "issued30": "@outputs('Compose_sum30')",
+                "issued90": "@outputs('Compose_sum90')",
+                "tx90": "@length(body('Filter_rows90'))"
+              },
+              "runAfter": {
+                "Compose_sum30": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Append_usage_row": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": "vUsage",
+                "value": "@union(variables('vUsage'), createArray(outputs('Compose_usage_row')))"
+              },
+              "runAfter": {
+                "Compose_usage_row": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "runtimeConfiguration": {
+            "concurrency": {
+              "repetitions": 1
+            }
+          },
+          "runAfter": {
+            "Compose_d90": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Filter_used": {
+          "type": "Query",
+          "inputs": {
+            "from": "@variables('vUsage')",
+            "where": "@greater(item()?['issued90'], 0)"
+          },
+          "runAfter": {
+            "For_each_usage_stock": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "Table_usage_html": {
+          "type": "Table",
+          "inputs": {
+            "from": "@body('Filter_used')",
+            "format": "HTML",
+            "columns": [
+              {
+                "header": "Item",
+                "value": "@item()?['item']"
+              },
+              {
+                "header": "Name",
+                "value": "@item()?['name']"
+              },
+              {
+                "header": "Location",
+                "value": "@item()?['location']"
+              },
+              {
+                "header": "On hand",
+                "value": "@item()?['onHand']"
+              },
+              {
+                "header": "Issued 30 days",
+                "value": "@item()?['issued30']"
+              },
+              {
+                "header": "Issued 90 days",
+                "value": "@item()?['issued90']"
+              },
+              {
+                "header": "Issue transactions (90d)",
+                "value": "@item()?['tx90']"
+              }
+            ]
+          },
+          "runAfter": {
+            "Filter_used": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Table_usage_csv": {
+          "type": "Table",
+          "inputs": {
+            "from": "@variables('vUsage')",
+            "format": "CSV",
+            "columns": [
+              {
+                "header": "StockKey",
+                "value": "@item()?['stockKey']"
+              },
+              {
+                "header": "Item",
+                "value": "@item()?['item']"
+              },
+              {
+                "header": "Name",
+                "value": "@item()?['name']"
+              },
+              {
+                "header": "Location",
+                "value": "@item()?['location']"
+              },
+              {
+                "header": "OnHand",
+                "value": "@item()?['onHand']"
+              },
+              {
+                "header": "Issued30d",
+                "value": "@item()?['issued30']"
+              },
+              {
+                "header": "Issued90d",
+                "value": "@item()?['issued90']"
+              },
+              {
+                "header": "IssueTx90d",
+                "value": "@item()?['tx90']"
+              }
+            ]
+          },
+          "runAfter": {
+            "Table_usage_html": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_usage_summary": {
+          "type": "Compose",
+          "inputs": "@concat(string(length(variables('vUsage'))), ' stock records; ', string(length(body('Filter_used'))), ' with issues in the last 90 days')",
+          "runAfter": {
+            "Table_usage_csv": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Send_usage_email_if_recipients": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@and(not(empty(coalesce(outputs('Compose_Settings')?['ReportRecipientsUsage'], ''))), not(contains(coalesce(outputs('Compose_Settings')?['ReportRecipientsUsage'], ''), 'CHANGE-ME')))",
+              true
+            ]
+          },
+          "actions": {
+            "Send_usage_email": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_office365",
+                  "operationId": "SendEmailV2",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                },
+                "parameters": {
+                  "emailMessage/To": "@replace(coalesce(outputs('Compose_Settings')?['ReportRecipientsUsage'], ''), ',', ';')",
+                  "emailMessage/Subject": "@concat('POU usage 30/90 days ', outputs('Compose_LocalDate'), ': ', outputs('Compose_usage_summary'))",
+                  "emailMessage/Body": "@concat('<html><body style=''font-family:Segoe UI,Arial,sans-serif;font-size:13px''><h3>POU usage by item/location</h3><p>Units ISSUED (removed) per stock record. Source: ledger rows with LedgerType=ISSUE and PostingState=Posted. UsageIncludeLegacy controls whether pre-cutover workbook history is included. The attached CSV has every stock record; sort it by Issued90d.</p>', '<h4>Items issued in the last 90 days (list is ordered by item, then location)</h4>', body('Table_usage_html'), '<p style=\"color:#555\">Usage is demand history, not a purchase recommendation: it does not consider lead times or open orders.</p></body></html>')",
+                  "emailMessage/Importance": "Normal",
+                  "emailMessage/Attachments": [
+                    {
+                      "Name": "POU_usage_30_90.csv",
+                      "ContentBytes": "@base64(body('Table_usage_csv'))"
+                    }
+                  ]
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "Send_usage_email_if_sent": {
+              "type": "If",
+              "expression": {
+                "equals": [
+                  "@equals(actions('Send_usage_email')?['status'], 'Succeeded')",
+                  true
+                ]
+              },
+              "actions": {
+                "Find_setting_LastWeeklyUsageDate": {
+                  "type": "Query",
+                  "inputs": {
+                    "from": "@body('Get_settings')?['d']?['results']",
+                    "where": "@equals(item()?['SettingKey'], 'LastWeeklyUsageDate')"
+                  },
+                  "runAfter": {}
+                },
+                "Save_setting_LastWeeklyUsageDate": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_sharepointonline",
+                      "operationId": "HttpRequest",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                    },
+                    "parameters": {
+                      "dataset": "@outputs('Cfg_SiteUrl')",
+                      "parameters/method": "POST",
+                      "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSettings'')/items(', first(body('Find_setting_LastWeeklyUsageDate'))?['Id'], ')')",
+                      "parameters/headers": {
+                        "Accept": "application/json;odata=verbose",
+                        "Content-Type": "application/json;odata=verbose",
+                        "X-HTTP-Method": "MERGE",
+                        "IF-MATCH": "*"
+                      },
+                      "parameters/body": {
+                        "__metadata": {
+                          "type": "SP.Data.POUSettingsListItem"
+                        },
+                        "SettingValue": "@outputs('Compose_LocalDate')"
+                      }
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {
+                    "Find_setting_LastWeeklyUsageDate": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "Send_usage_email": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped",
+                  "TimedOut"
+                ]
+              }
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "runAfter": {
+            "Compose_usage_summary": [
+              "Succeeded"
+            ]
+          }
+        }
+      }
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}

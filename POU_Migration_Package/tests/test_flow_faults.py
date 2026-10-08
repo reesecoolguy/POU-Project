@@ -98,3 +98,43 @@ def _build_env(f, url, salt):
     s.create_item("POUItems", {"Title": "A", "ItemID": "A", "ItemName": "Widget"})
     s.create_item("POUStockLocations", {"Title": "A @ 1-A", "StockKey": "A|1-A", "ItemID": "A", "LocationCode": "1-A", "ItemName": "Widget", "MinQty": 2, "MaxQty": 10, "StockVersion": 0, "BalanceStatus": "NoBalance"})
     return e
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Regression tests for two bugs found by the concurrency suite
+# ---------------------------------------------------------------------------------------------------------------------
+def test_applied_intent_is_finalised_not_voided_after_later_postings_advanced_the_version(env):
+    """Run 1 applies the stock change then the host dies. Other operators keep posting (stock version moves past our slot).
+    Re-processing run 1 must recognise its change as applied and finalise it - never void it and never say 'NotApplied'."""
+    from flowlab.connectors import FaultPlan, Rule
+    opening(env, "A|1-A", 8)
+    sess = env.login()["sessionId"]
+    r1 = env.new_request("station1@test", RequestType="ISSUE", SessionID=sess, StationID="CAB-01", StockKey="A|1-A", Quantity=1)
+    env.process(r1, plan=FaultPlan([Rule("POST", r"POUStockLocations.*items\(\d+\)", "after", nth=1)]))     # dies right after the stock write
+    s = env.stock("A|1-A")
+    assert (s["OnHandQty"], s["StockVersion"]) == (7, 2)
+    assert [l["PostingState"] for l in env.ledger("A|1-A") if l["LedgerType"] == "ISSUE"] == ["Intent"]
+    for _ in range(2):                                                    # later movements build on the unfinished row
+        r = env.new_request("station1@test", RequestType="ISSUE", SessionID=sess, StationID="CAB-01", StockKey="A|1-A", Quantity=1)
+        assert env.process(r).response["body"]["status"] == "Succeeded"
+    assert env.stock("A|1-A")["StockVersion"] == 4
+    env.clock.advance(300)
+    b = env.process(r1).response["body"]
+    assert b["status"] == "Succeeded" and b["effect"] == "Applied", b
+    rows = sorted(env.ledger("A|1-A"), key=lambda l: l["SeqNo"] or 0)
+    assert [l["PostingState"] for l in rows] == ["Posted"] * 4 and not [l for l in rows if l["PostingState"] == "Voided"]
+    assert [l["SeqNo"] for l in rows] == [1, 2, 3, 4]
+    assert env.stock("A|1-A")["OnHandQty"] == 5
+    assert check(env, expect_complete=True) == []
+
+
+def test_transient_failure_inside_the_apply_loop_still_completes_in_one_run(env):
+    from flowlab.connectors import FaultPlan, Rule
+    opening(env, "A|1-A", 8)
+    sess = env.login()["sessionId"]
+    r = env.new_request("station1@test", RequestType="ISSUE", SessionID=sess, StationID="CAB-01", StockKey="A|1-A", Quantity=2)
+    rt = env.process(r, plan=FaultPlan([Rule("POST", r"POUStockLocations.*items\(\d+\)", "throttle", nth=1)]))   # first stock write is throttled
+    b = rt.response["body"]
+    assert b["status"] == "Succeeded" and b["newOnHand"] == "6", b
+    assert [l["PostingState"] for l in env.ledger("A|1-A") if l["LedgerType"] == "ISSUE"] == ["Posted"]
+    assert env.req(r)["RequestStatus"] == "Succeeded"

@@ -128,13 +128,13 @@ def build_core(c: Block):
     stage_triage_claim(c)
     stage_existing_ledger(c)
     c.cond("Stage_giveup", and_(RUN, Ex(f"greater(variables('vAttempts'), {cfgi('MaxProcessAttempts', 5)})")),
-           lambda t: reject(t, "Result_gave_up", "GAVE_UP"))   # no ledger row exists here, so NotApplied is established
-    c.cond("Stage_context_auth", RUN, stage_context_auth)
-    c.cond("Dispatch_quantity", and_(RUN, in_(T, QTY_TYPES)), stage_post_loop)
-    c.cond("Dispatch_master", and_(RUN, in_(T, ["ITEM_CREATE", "LOCATION_ADD"])), stage_master)
-    c.cond("Dispatch_param", and_(RUN, eq(T, "PARAM_UPDATE")), stage_param)
-    c.cond("Dispatch_approve", and_(RUN, eq(T, "APPROVE")), stage_approve)
-    c.cond("Stage_apply", and_(CONT, eq(v("vIntent"), "ours")), stage_apply)
+           lambda t: reject(t, "Result_gave_up", "GAVE_UP"), always=True)   # no ledger row exists here, so NotApplied is established
+    c.cond("Stage_context_auth", RUN, stage_context_auth, always=True)
+    c.cond("Dispatch_quantity", and_(RUN, in_(T, QTY_TYPES)), stage_post_loop, always=True)
+    c.cond("Dispatch_master", and_(RUN, in_(T, ["ITEM_CREATE", "LOCATION_ADD"])), stage_master, always=True)
+    c.cond("Dispatch_param", and_(RUN, eq(T, "PARAM_UPDATE")), stage_param, always=True)
+    c.cond("Dispatch_approve", and_(RUN, eq(T, "APPROVE")), stage_approve, always=True)
+    c.cond("Stage_apply", and_(CONT, eq(v("vIntent"), "ours")), stage_apply, always=True)
     stage_finalize(c)
 
 
@@ -163,7 +163,7 @@ def stage_triage_claim(c: Block):
                lambda u: result(u, "Result_claim_lost", "Processing", "CLAIM_LOST",
                                 "Another worker is processing this request. Do not repeat; the status will update.", finalize=False),
                lambda u: u.set_var("vAttempts", X(attempts), name="Set_vAttempts"), always=True)
-    c.cond("Stage_claim", CONT, claim)
+    c.cond("Stage_claim", CONT, claim, always=True)
 
 
 def stage_existing_ledger(c: Block):
@@ -179,7 +179,7 @@ def stage_existing_ledger(c: Block):
                                  auth_by=X(coalesce(Ex("outputs('Compose_ExistingLedger')?['AuthorizedByUPN']"), "")))))
         t.cond("If_existing_intent", Ex("and(not(equals(outputs('Compose_ExistingLedger'), null)), equals(outputs('Compose_ExistingLedger')?['PostingState'], 'Intent'))"),
                lambda u: u.set_var("vIntent", "ours", name="Set_vIntent_resume"))
-    c.cond("Stage_existing_ledger", and_(CONT, in_(T, QTY_TYPES)), existing)
+    c.cond("Stage_existing_ledger", and_(CONT, in_(T, QTY_TYPES)), existing, always=True)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -384,15 +384,18 @@ def stage_apply(t: Block):
             l.sp_get("Get_stock_apply", L_STOCK, ["StockKey eq '", qv(itn("StockKey")), "'"], select=STOCK_SELECT, top=2)
             l.compose("Compose_StockApply", X("first(body('Get_stock_apply')?['d']?['results'])"))
             sv, oh = _pick("Compose_StockApply", "StockVersion"), _pick("Compose_StockApply", "OnHandQty")
+            # 'applied' = the stock version has reached our slot (version > seq means later postings already built on our change:
+            # the next poster's chain check requires OnHand == our QtyAfter, so a higher version can only follow our apply)
             seq, qa, qb = itn("SeqNo"), itn("QtyAfter"), itn("QtyBefore")
             l.compose("Compose_ApplyState", X(
                 f"if(equals(outputs('Compose_StockApply'), null), 'anomaly', "
+                f"if(greater(coalesce({sv}, 0), {seq}), 'applied', "
                 f"if(and(equals({sv}, {seq}), equals({oh}, {qa})), 'applied', "
-                f"if(and(equals({sv}, sub({seq}, 1)), if(equals({qb}, null), equals({oh}, null), equals({oh}, {qb}))), 'unapplied', 'anomaly')))"))
+                f"if(and(equals({sv}, sub({seq}, 1)), if(equals({qb}, null), equals({oh}, null), equals({oh}, {qb}))), 'unapplied', 'anomaly'))))"))
             l.cond("If_state_applied", and_(CONT, eq(o("Compose_ApplyState"), "applied")),
                    lambda u: u.set_var("vApplied", "yes", name="Set_vApplied_already"))
             minq = _pick("Compose_StockApply", "MinQty")
-            low = and_(not_(is_null(minq)), if_(eq(cfg("LowStockRule"), "LT"), f("less", qa, minq), f("lessOrEquals", qa, minq)))
+            low = and_(not_(is_null(minq)), if_(eq(cfg("LowStockRule"), "LT"), f("less", qa, num(minq)), f("lessOrEquals", qa, num(minq))))
 
             def do_apply(u: Block):
                 u.attempt("Apply_stock", lambda s, n: s.sp_update(
@@ -518,7 +521,7 @@ def stage_param(t: Block):
         ])
         pr = o("Param_Result")
         l.cond("If_p_reject", and_(CONT, nz(pr)), lambda u: reject(u, "Result_p_reject", Ex(str(pr)), X(msg_of(Ex(str(pr))))))
-        low = and_(not_(is_null(cur("OnHandQty"))), if_(eq(cfg("LowStockRule"), "LT"), f("less", cur("OnHandQty"), new_min), f("lessOrEquals", cur("OnHandQty"), new_min)))
+        low = and_(not_(is_null(cur("OnHandQty"))), if_(eq(cfg("LowStockRule"), "LT"), f("less", num(cur("OnHandQty")), num(new_min)), f("lessOrEquals", num(cur("OnHandQty")), num(new_min))))
 
         def apply(u: Block):
             u.attempt("Apply_param", lambda s, n: s.sp_update(

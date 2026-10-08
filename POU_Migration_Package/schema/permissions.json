@@ -67,7 +67,7 @@
       "operators": "read",
       "supervisors": "read",
       "admins": "contribute",
-      "flowservice": "read"
+      "flowservice": "flowwriter"
     },
     "POUStations": {
       "operators": "read",

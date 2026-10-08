@@ -825,27 +825,34 @@ class FakeSharePoint:
         ast = _Parser(_tokenize(flt)).parse() if flt else None
         items = list(fl.items.values())
         total = len(items)
-        # threshold emulation
+        # list-view threshold emulation (documented behaviour, modelled conservatively):
+        #  * no filter + default (ID) order + $top  -> allowed: the engine reads TOP n rows by ID and stops
+        #  * a filter containing an ID range        -> allowed for the same reason
+        #  * otherwise an indexed column in an AND-ed condition must narrow the result to <= threshold rows
+        #  * ordering by a non-indexed column on a large list is refused
         if total > self.threshold:
-            ok = False
+            ob = qs.get("$orderby")
+            if ob:
+                for part in ob.split(","):
+                    fld = part.strip().split(" ")[0]
+                    if fld not in ("ID", "Id") and not (fl.fields.get(fld) and fl.fields[fld].indexed):
+                        raise SPHttp(500, "-2147024860, System.Runtime.InteropServices.COMException",
+                                     "The attempted operation is prohibited because it exceeds the list view threshold enforced by the administrator.")
             if ast is not None:
+                ok = False
                 for c in _conjuncts(ast):
                     flds = self._fields_in(c)
-                    if flds and all((fl.fields.get(f) and fl.fields[f].indexed) or f in ("ID", "Id") for f in flds):
+                    if flds and all(x in ("ID", "Id") for x in flds):
+                        ok = True
+                        break
+                    if flds and all((fl.fields.get(x) and fl.fields[x].indexed) for x in flds):
                         n = sum(1 for it in items if _eval(c, self._flat(it), types))
                         if n <= self.threshold:
                             ok = True
                             break
-            if not ok:
-                raise SPHttp(500, "-2147024860, System.Runtime.InteropServices.COMException",
-                             "The attempted operation is prohibited because it exceeds the list view threshold enforced by the administrator.")
-            ob = qs.get("$orderby")
-            if ob:
-                for part in ob.split(","):
-                    f = part.strip().split(" ")[0]
-                    if f not in ("ID", "Id") and not (fl.fields.get(f) and fl.fields[f].indexed):
-                        raise SPHttp(500, "-2147024860, System.Runtime.InteropServices.COMException",
-                                     "The attempted operation is prohibited because it exceeds the list view threshold enforced by the administrator.")
+                if not ok:
+                    raise SPHttp(500, "-2147024860, System.Runtime.InteropServices.COMException",
+                                 "The attempted operation is prohibited because it exceeds the list view threshold enforced by the administrator.")
         if ast is not None:
             items = [it for it in items if _eval(ast, self._flat(it), types)]
         # order

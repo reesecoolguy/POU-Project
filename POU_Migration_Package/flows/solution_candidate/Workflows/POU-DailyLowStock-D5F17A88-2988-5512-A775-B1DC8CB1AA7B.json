@@ -1,0 +1,956 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_sharepointonline": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "pou_sharedsharepointonline_pou"
+        },
+        "api": {
+          "name": "shared_sharepointonline"
+        }
+      },
+      "shared_office365": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "pou_sharedoffice365_pou"
+        },
+        "api": {
+          "name": "shared_office365"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "Recurrence": {
+          "type": "Recurrence",
+          "recurrence": {
+            "frequency": "Hour",
+            "interval": 1
+          },
+          "metadata": {
+            "operationMetadataId": "00000000-0000-0000-0000-000000000000"
+          }
+        }
+      },
+      "actions": {
+        "Cfg_SiteUrl": {
+          "type": "Compose",
+          "inputs": "https://CHANGE-ME.sharepoint.com/sites/POU",
+          "runAfter": {}
+        },
+        "Guard_site_url_configured": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@contains(outputs('Cfg_SiteUrl'), 'CHANGE-ME')",
+              true
+            ]
+          },
+          "actions": {
+            "Stop_site_url_not_set": {
+              "type": "Terminate",
+              "inputs": {
+                "runStatus": "Failed",
+                "runError": {
+                  "code": "POU_CONFIG",
+                  "message": "Edit the Cfg_SiteUrl action: it still contains CHANGE-ME."
+                }
+              },
+              "runAfter": {}
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "runAfter": {
+            "Cfg_SiteUrl": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Get_settings": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_sharepointonline",
+              "operationId": "HttpRequest",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+            },
+            "parameters": {
+              "dataset": "@outputs('Cfg_SiteUrl')",
+              "parameters/method": "GET",
+              "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSettings'')/items', '?', '$select=Id,SettingKey,SettingValue', '&', '$top=500')",
+              "parameters/headers": {
+                "Accept": "application/json;odata=verbose"
+              }
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "Guard_site_url_configured": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "Select_settings": {
+          "type": "Select",
+          "inputs": {
+            "from": "@body('Get_settings')?['d']?['results']",
+            "select": "@concat('\"', item()?['SettingKey'], '\":\"', replace(replace(coalesce(item()?['SettingValue'], ''), '\"', ''), '\\', '/'), '\"')"
+          },
+          "runAfter": {
+            "Get_settings": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_Settings": {
+          "type": "Compose",
+          "inputs": "@json(concat('{', join(body('Select_settings'), ','), '}'))",
+          "runAfter": {
+            "Select_settings": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_LocalDate": {
+          "type": "Compose",
+          "inputs": "@convertFromUtc(utcNow(), coalesce(outputs('Compose_Settings')?['DisplayTimeZoneWindows'], 'Central Standard Time'), 'yyyy-MM-dd')",
+          "runAfter": {
+            "Compose_Settings": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_LocalHour": {
+          "type": "Compose",
+          "inputs": "@int(convertFromUtc(utcNow(), coalesce(outputs('Compose_Settings')?['DisplayTimeZoneWindows'], 'Central Standard Time'), 'HH'))",
+          "runAfter": {
+            "Compose_LocalDate": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_LocalDow": {
+          "type": "Compose",
+          "inputs": "@toLower(convertFromUtc(utcNow(), coalesce(outputs('Compose_Settings')?['DisplayTimeZoneWindows'], 'Central Standard Time'), 'dddd'))",
+          "runAfter": {
+            "Compose_LocalHour": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_Due": {
+          "type": "Compose",
+          "inputs": "@and(greaterOrEquals(outputs('Compose_LocalHour'), int(coalesce(outputs('Compose_Settings')?['LowStockReportHourLocal'], '7'))), not(equals(coalesce(outputs('Compose_Settings')?['LastLowStockReportDate'], ''), outputs('Compose_LocalDate'))))",
+          "runAfter": {
+            "Compose_LocalDow": [
+              "Succeeded"
+            ]
+          }
+        },
+        "If_not_due": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@equals(outputs('Compose_Due'), false)",
+              true
+            ]
+          },
+          "actions": {
+            "Stop_not_due": {
+              "type": "Terminate",
+              "inputs": {
+                "runStatus": "Succeeded"
+              },
+              "runAfter": {}
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "runAfter": {
+            "Compose_Due": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Init_vLow": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vLow",
+                "type": "array",
+                "value": []
+              }
+            ]
+          },
+          "runAfter": {
+            "If_not_due": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "Init_vLowNext": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vLowNext",
+                "type": "string",
+                "value": ""
+              }
+            ]
+          },
+          "runAfter": {
+            "Init_vLow": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Init_vNoBal": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vNoBal",
+                "type": "array",
+                "value": []
+              }
+            ]
+          },
+          "runAfter": {
+            "Init_vLowNext": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Init_vNoBalNext": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vNoBalNext",
+                "type": "string",
+                "value": ""
+              }
+            ]
+          },
+          "runAfter": {
+            "Init_vNoBal": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Init_vP1": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "vP1",
+                "type": "array",
+                "value": []
+              }
+            ]
+          },
+          "runAfter": {
+            "Init_vNoBalNext": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Low_reset_rows": {
+          "type": "SetVariable",
+          "inputs": {
+            "name": "vLow",
+            "value": []
+          },
+          "runAfter": {
+            "Init_vP1": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Low_first_uri": {
+          "type": "SetVariable",
+          "inputs": {
+            "name": "vLowNext",
+            "value": "@concat('/_api/web/lists/getbytitle(''POUStockLocations'')/items?$top=500&$select=StockKey,ItemID,ItemName,LocationCode,OnHandQty,MinQty,MaxQty,BalanceStatus', '&$orderby=LocationCode,ItemID', '&$filter=', 'LowStockFlag eq 1 and Active eq 1')"
+          },
+          "runAfter": {
+            "Low_reset_rows": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Low_until": {
+          "type": "Until",
+          "expression": "@empty(variables('vLowNext'))",
+          "limit": {
+            "count": 100,
+            "timeout": "PT1H"
+          },
+          "actions": {
+            "Low_page": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "HttpRequest",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@outputs('Cfg_SiteUrl')",
+                  "parameters/method": "GET",
+                  "parameters/uri": "@variables('vLowNext')",
+                  "parameters/headers": {
+                    "Accept": "application/json;odata=verbose"
+                  }
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "Low_append": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": "vLow",
+                "value": "@union(variables('vLow'), coalesce(body('Low_page')?['d']?['results'], createArray()))"
+              },
+              "runAfter": {
+                "Low_page": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Low_next": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": "vLowNext",
+                "value": "@if(empty(coalesce(body('Low_page')?['d']?['__next'], '')), '', substring(body('Low_page')?['d']?['__next'], indexOf(body('Low_page')?['d']?['__next'], '/_api/')))"
+              },
+              "runAfter": {
+                "Low_append": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "runAfter": {
+            "Low_first_uri": [
+              "Succeeded"
+            ]
+          }
+        },
+        "NoBal_reset_rows": {
+          "type": "SetVariable",
+          "inputs": {
+            "name": "vNoBal",
+            "value": []
+          },
+          "runAfter": {
+            "Low_until": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "NoBal_first_uri": {
+          "type": "SetVariable",
+          "inputs": {
+            "name": "vNoBalNext",
+            "value": "@concat('/_api/web/lists/getbytitle(''POUStockLocations'')/items?$top=500&$select=StockKey,ItemID,ItemName,LocationCode,OnHandQty,MinQty,MaxQty,BalanceStatus', '&$orderby=LocationCode,ItemID', '&$filter=', 'BalanceStatus eq ''NoBalance'' and Active eq 1')"
+          },
+          "runAfter": {
+            "NoBal_reset_rows": [
+              "Succeeded"
+            ]
+          }
+        },
+        "NoBal_until": {
+          "type": "Until",
+          "expression": "@empty(variables('vNoBalNext'))",
+          "limit": {
+            "count": 100,
+            "timeout": "PT1H"
+          },
+          "actions": {
+            "NoBal_page": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "HttpRequest",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@outputs('Cfg_SiteUrl')",
+                  "parameters/method": "GET",
+                  "parameters/uri": "@variables('vNoBalNext')",
+                  "parameters/headers": {
+                    "Accept": "application/json;odata=verbose"
+                  }
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "NoBal_append": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": "vNoBal",
+                "value": "@union(variables('vNoBal'), coalesce(body('NoBal_page')?['d']?['results'], createArray()))"
+              },
+              "runAfter": {
+                "NoBal_page": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "NoBal_next": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": "vNoBalNext",
+                "value": "@if(empty(coalesce(body('NoBal_page')?['d']?['__next'], '')), '', substring(body('NoBal_page')?['d']?['__next'], indexOf(body('NoBal_page')?['d']?['__next'], '/_api/')))"
+              },
+              "runAfter": {
+                "NoBal_append": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "runAfter": {
+            "NoBal_first_uri": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Select_low_rows": {
+          "type": "Select",
+          "inputs": {
+            "from": "@variables('vLow')",
+            "select": {
+              "Item": "@item()?['ItemID']",
+              "Name": "@item()?['ItemName']",
+              "Location": "@item()?['LocationCode']",
+              "OnHand": "@item()?['OnHandQty']",
+              "Min": "@item()?['MinQty']",
+              "Max": "@item()?['MaxQty']",
+              "SuggestedOrder": "@if(less(sub(coalesce(item()?['MaxQty'], 0), coalesce(item()?['OnHandQty'], 0)), 0), 0, sub(coalesce(item()?['MaxQty'], 0), coalesce(item()?['OnHandQty'], 0)))",
+              "Status": "@if(equals(coalesce(item()?['OnHandQty'], 0), 0), 'CRITICAL', 'LOW')"
+            }
+          },
+          "runAfter": {
+            "NoBal_until": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "Filter_critical": {
+          "type": "Query",
+          "inputs": {
+            "from": "@body('Select_low_rows')",
+            "where": "@equals(item()?['Status'], 'CRITICAL')"
+          },
+          "runAfter": {
+            "Select_low_rows": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Filter_low": {
+          "type": "Query",
+          "inputs": {
+            "from": "@body('Select_low_rows')",
+            "where": "@equals(item()?['Status'], 'LOW')"
+          },
+          "runAfter": {
+            "Filter_critical": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_ordered_rows": {
+          "type": "Compose",
+          "inputs": "@union(body('Filter_critical'), body('Filter_low'))",
+          "runAfter": {
+            "Filter_low": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Table_low": {
+          "type": "Table",
+          "inputs": {
+            "from": "@outputs('Compose_ordered_rows')",
+            "format": "HTML",
+            "columns": [
+              {
+                "header": "Status",
+                "value": "@item()?['Status']"
+              },
+              {
+                "header": "Item",
+                "value": "@item()?['Item']"
+              },
+              {
+                "header": "Name",
+                "value": "@item()?['Name']"
+              },
+              {
+                "header": "Location",
+                "value": "@item()?['Location']"
+              },
+              {
+                "header": "On hand",
+                "value": "@item()?['OnHand']"
+              },
+              {
+                "header": "Min",
+                "value": "@item()?['Min']"
+              },
+              {
+                "header": "Max",
+                "value": "@item()?['Max']"
+              },
+              {
+                "header": "Suggested order qty (Max - On hand)",
+                "value": "@item()?['SuggestedOrder']"
+              }
+            ]
+          },
+          "runAfter": {
+            "Compose_ordered_rows": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Select_nobal_rows": {
+          "type": "Select",
+          "inputs": {
+            "from": "@variables('vNoBal')",
+            "select": {
+              "Item": "@item()?['ItemID']",
+              "Name": "@item()?['ItemName']",
+              "Location": "@item()?['LocationCode']"
+            }
+          },
+          "runAfter": {
+            "Table_low": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Table_nobal": {
+          "type": "Table",
+          "inputs": {
+            "from": "@body('Select_nobal_rows')",
+            "format": "HTML",
+            "columns": [
+              {
+                "header": "Item",
+                "value": "@item()?['Item']"
+              },
+              {
+                "header": "Name",
+                "value": "@item()?['Name']"
+              },
+              {
+                "header": "Location",
+                "value": "@item()?['Location']"
+              }
+            ]
+          },
+          "runAfter": {
+            "Select_nobal_rows": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Get_priority1_items": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_sharepointonline",
+              "operationId": "HttpRequest",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+            },
+            "parameters": {
+              "dataset": "@outputs('Cfg_SiteUrl')",
+              "parameters/method": "GET",
+              "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUItems'')/items', '?', '$filter=', 'Priority eq 1 and Active eq 1', '&', '$select=ItemID,ItemName', '&', '$top=200')",
+              "parameters/headers": {
+                "Accept": "application/json;odata=verbose"
+              }
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "Table_nobal": [
+              "Succeeded"
+            ]
+          }
+        },
+        "For_each_p1_item": {
+          "type": "Foreach",
+          "foreach": "@body('Get_priority1_items')?['d']?['results']",
+          "actions": {
+            "Get_p1_stock": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "HttpRequest",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@outputs('Cfg_SiteUrl')",
+                  "parameters/method": "GET",
+                  "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUStockLocations'')/items', '?', '$filter=', 'ItemID eq ''', uriComponent(replace(string(items('For_each_p1_item')?['ItemID']), '''', '''''')), ''' and Active eq 1', '&', '$select=StockKey,ItemID,ItemName,LocationCode,OnHandQty,MinQty,MaxQty,BalanceStatus', '&', '$top=50')",
+                  "parameters/headers": {
+                    "Accept": "application/json;odata=verbose"
+                  }
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "Append_p1_rows": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": "vP1",
+                "value": "@union(variables('vP1'), coalesce(body('Get_p1_stock')?['d']?['results'], createArray()))"
+              },
+              "runAfter": {
+                "Get_p1_stock": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "runtimeConfiguration": {
+            "concurrency": {
+              "repetitions": 1
+            }
+          },
+          "runAfter": {
+            "Get_priority1_items": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Table_p1": {
+          "type": "Table",
+          "inputs": {
+            "from": "@variables('vP1')",
+            "format": "HTML",
+            "columns": [
+              {
+                "header": "Item",
+                "value": "@item()?['ItemID']"
+              },
+              {
+                "header": "Name",
+                "value": "@item()?['ItemName']"
+              },
+              {
+                "header": "Location",
+                "value": "@item()?['LocationCode']"
+              },
+              {
+                "header": "On hand",
+                "value": "@item()?['OnHandQty']"
+              },
+              {
+                "header": "Min",
+                "value": "@item()?['MinQty']"
+              },
+              {
+                "header": "Max",
+                "value": "@item()?['MaxQty']"
+              }
+            ]
+          },
+          "runAfter": {
+            "For_each_p1_item": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
+            ]
+          }
+        },
+        "Compose_counts": {
+          "type": "Compose",
+          "inputs": "@concat(string(length(variables('vLow'))), ' at or below minimum (', string(length(body('Filter_critical'))), ' CRITICAL = zero on hand); ', string(length(variables('vNoBal'))), ' need a first count')",
+          "runAfter": {
+            "Table_p1": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Compose_body": {
+          "type": "Compose",
+          "inputs": "@concat('<html><body style=''font-family:Segoe UI,Arial,sans-serif;font-size:13px''><h3>POU low stock - daily</h3><p>Rule: LowStockRule setting (LE = on hand <= min, LT = on hand < min). <b>Suggested order quantity is a suggestion only (Max - On hand). It does NOT consider open purchase orders: this system holds no order data.</b></p>', '<h4>Low stock</h4>', body('Table_low'), '<h4>Needs a first count (no verified balance - not counted as low stock)</h4>', body('Table_nobal'), '<h4>Priority 1 items - on hand</h4>', body('Table_p1'), '<p style=\"color:#555\">Generated by POU-DailyLowStock. Counts: see subject. Change recipients/time in the POUSettings list.</p></body></html>')",
+          "runAfter": {
+            "Compose_counts": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Send_low_stock_email_if_recipients": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@and(not(empty(coalesce(outputs('Compose_Settings')?['ReportRecipientsLowStock'], ''))), not(contains(coalesce(outputs('Compose_Settings')?['ReportRecipientsLowStock'], ''), 'CHANGE-ME')))",
+              true
+            ]
+          },
+          "actions": {
+            "Send_low_stock_email": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_office365",
+                  "operationId": "SendEmailV2",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                },
+                "parameters": {
+                  "emailMessage/To": "@replace(coalesce(outputs('Compose_Settings')?['ReportRecipientsLowStock'], ''), ',', ';')",
+                  "emailMessage/Subject": "@concat('POU low stock ', outputs('Compose_LocalDate'), ': ', outputs('Compose_counts'))",
+                  "emailMessage/Body": "@outputs('Compose_body')",
+                  "emailMessage/Importance": "Normal"
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "Send_low_stock_email_if_sent": {
+              "type": "If",
+              "expression": {
+                "equals": [
+                  "@equals(actions('Send_low_stock_email')?['status'], 'Succeeded')",
+                  true
+                ]
+              },
+              "actions": {
+                "Find_setting_LastLowStockReportDate": {
+                  "type": "Query",
+                  "inputs": {
+                    "from": "@body('Get_settings')?['d']?['results']",
+                    "where": "@equals(item()?['SettingKey'], 'LastLowStockReportDate')"
+                  },
+                  "runAfter": {}
+                },
+                "Save_setting_LastLowStockReportDate": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_sharepointonline",
+                      "operationId": "HttpRequest",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                    },
+                    "parameters": {
+                      "dataset": "@outputs('Cfg_SiteUrl')",
+                      "parameters/method": "POST",
+                      "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSettings'')/items(', first(body('Find_setting_LastLowStockReportDate'))?['Id'], ')')",
+                      "parameters/headers": {
+                        "Accept": "application/json;odata=verbose",
+                        "Content-Type": "application/json;odata=verbose",
+                        "X-HTTP-Method": "MERGE",
+                        "IF-MATCH": "*"
+                      },
+                      "parameters/body": {
+                        "__metadata": {
+                          "type": "SP.Data.POUSettingsListItem"
+                        },
+                        "SettingValue": "@outputs('Compose_LocalDate')"
+                      }
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {
+                    "Find_setting_LastLowStockReportDate": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "Send_low_stock_email": [
+                  "Succeeded",
+                  "Failed",
+                  "Skipped",
+                  "TimedOut"
+                ]
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "NoRcpt_Ops_event": {
+                "type": "Scope",
+                "actions": {
+                  "NoRcpt_Get_event": {
+                    "type": "ApiConnection",
+                    "inputs": {
+                      "host": {
+                        "connectionName": "shared_sharepointonline",
+                        "operationId": "HttpRequest",
+                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                      },
+                      "parameters": {
+                        "dataset": "@outputs('Cfg_SiteUrl')",
+                        "parameters/method": "GET",
+                        "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUOpsEvents'')/items', '?', '$filter=', 'EventKey eq ''', uriComponent(replace(string('REPORT_RECIPIENTS_LOWSTOCK'), '''', '''''')), '''', '&', '$select=Id,OccurrenceCount', '&', '$top=2')",
+                        "parameters/headers": {
+                          "Accept": "application/json;odata=verbose"
+                        }
+                      },
+                      "authentication": "@parameters('$authentication')"
+                    },
+                    "runAfter": {}
+                  },
+                  "NoRcpt_Event_row": {
+                    "type": "Compose",
+                    "inputs": "@first(body('NoRcpt_Get_event')?['d']?['results'])",
+                    "runAfter": {
+                      "NoRcpt_Get_event": [
+                        "Succeeded"
+                      ]
+                    }
+                  },
+                  "NoRcpt_Event_exists": {
+                    "type": "If",
+                    "expression": {
+                      "equals": [
+                        "@not(equals(outputs('NoRcpt_Event_row'), null))",
+                        true
+                      ]
+                    },
+                    "actions": {
+                      "NoRcpt_Update_event": {
+                        "type": "ApiConnection",
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_sharepointonline",
+                            "operationId": "HttpRequest",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                          },
+                          "parameters": {
+                            "dataset": "@outputs('Cfg_SiteUrl')",
+                            "parameters/method": "POST",
+                            "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUOpsEvents'')/items(', outputs('NoRcpt_Event_row')?['Id'], ')')",
+                            "parameters/headers": {
+                              "Accept": "application/json;odata=verbose",
+                              "Content-Type": "application/json;odata=verbose",
+                              "X-HTTP-Method": "MERGE",
+                              "IF-MATCH": "*"
+                            },
+                            "parameters/body": {
+                              "__metadata": {
+                                "type": "SP.Data.POUOpsEventsListItem"
+                              },
+                              "LastSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                              "OccurrenceCount": "@add(int(coalesce(outputs('NoRcpt_Event_row')?['OccurrenceCount'], 1)), 1)",
+                              "Details": "Setting ReportRecipientsLowStock is empty or still CHANGE-ME@... so the daily report was not emailed.",
+                              "Resolved": false
+                            }
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        },
+                        "runAfter": {}
+                      }
+                    },
+                    "else": {
+                      "actions": {
+                        "NoRcpt_Create_event": {
+                          "type": "ApiConnection",
+                          "inputs": {
+                            "host": {
+                              "connectionName": "shared_sharepointonline",
+                              "operationId": "HttpRequest",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                            },
+                            "parameters": {
+                              "dataset": "@outputs('Cfg_SiteUrl')",
+                              "parameters/method": "POST",
+                              "parameters/uri": "/_api/web/lists/getbytitle('POUOpsEvents')/items",
+                              "parameters/headers": {
+                                "Accept": "application/json;odata=verbose",
+                                "Content-Type": "application/json;odata=verbose"
+                              },
+                              "parameters/body": {
+                                "__metadata": {
+                                  "type": "SP.Data.POUOpsEventsListItem"
+                                },
+                                "Title": "Low-stock report recipients not configured",
+                                "EventKey": "REPORT_RECIPIENTS_LOWSTOCK",
+                                "EventType": "CONFIG",
+                                "Severity": "Warning",
+                                "Subject": "Low-stock report recipients not configured",
+                                "Details": "Setting ReportRecipientsLowStock is empty or still CHANGE-ME@... so the daily report was not emailed.",
+                                "FirstSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                "LastSeenUtc": "@utcNow('yyyy-MM-ddTHH:mm:ssZ')",
+                                "OccurrenceCount": 1,
+                                "Resolved": false
+                              }
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          },
+                          "runAfter": {}
+                        }
+                      }
+                    },
+                    "runAfter": {
+                      "NoRcpt_Event_row": [
+                        "Succeeded"
+                      ]
+                    }
+                  }
+                },
+                "runAfter": {}
+              }
+            }
+          },
+          "runAfter": {
+            "Compose_body": [
+              "Succeeded"
+            ]
+          }
+        }
+      }
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}

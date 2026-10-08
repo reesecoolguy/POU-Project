@@ -268,3 +268,12 @@ def test_param_update_changes_min_max_and_flag_never_quantity(env):
     assert (s["MinQty"], s["MaxQty"], s["OnHandQty"], s["LowStockFlag"]) == (6, 12, 5, True)
     r = env.new_request("sup@test", RequestType="PARAM_UPDATE", StationID="CAB-01", StockKey="A|1-A", PayloadJson=json.dumps({"Active": False}))
     assert env.process(r, caller="sup@test").response["body"]["code"] == "NONZERO_STOCK"
+
+
+def test_param_update_on_a_record_with_no_balance_works(env):
+    """NoBalance rows have null OnHandQty: every comparison in the flows must be null-safe (and() does not short-circuit)."""
+    r = env.new_request("sup@test", RequestType="PARAM_UPDATE", StationID="CAB-01", StockKey="A|1-A", PayloadJson=json.dumps({"MinQty": 3, "MaxQty": 9, "Area": "Bay 4"}))
+    b = env.process(r, caller="sup@test").response["body"]
+    assert b["status"] == "Succeeded", b
+    s = env.stock("A|1-A")
+    assert (s["MinQty"], s["MaxQty"], s["Area"], s["OnHandQty"], s["LowStockFlag"]) == (3, 9, "Bay 4", None, False)

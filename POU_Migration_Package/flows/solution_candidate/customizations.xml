@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ImportExportXml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Entities />
+  <Roles />
+  <Workflows>
+    <Workflow WorkflowId="{5ee8979e-38a9-53ed-869b-2ec19a577a09}" Name="POU-Session">
+      <JsonFileName>/Workflows/POU-Session-5EE8979E-38A9-53ED-869B-2EC19A577A09.json</JsonFileName>
+      <Type>1</Type><Subprocess>0</Subprocess><Category>5</Category><Mode>0</Mode><Scope>4</Scope><OnDemand>0</OnDemand>
+      <TriggerOnCreate>0</TriggerOnCreate><TriggerOnDelete>0</TriggerOnDelete><AsyncAutodelete>0</AsyncAutodelete><SyncWorkflowLogOnFailure>0</SyncWorkflowLogOnFailure>
+      <StateCode>0</StateCode><StatusCode>1</StatusCode><RunAs>1</RunAs><IsTransacted>1</IsTransacted><IntroducedVersion>1.0</IntroducedVersion>
+      <IsCustomizable>1</IsCustomizable><BusinessProcessType>0</BusinessProcessType><IsCustomProcessingStepAllowedForOtherPublishers>1</IsCustomProcessingStepAllowedForOtherPublishers>
+      <PrimaryEntity>none</PrimaryEntity>
+      <LocalizedNames><LocalizedName languagecode="1033" description="POU-Session" /></LocalizedNames>
+    </Workflow>
+    <Workflow WorkflowId="{d061b784-09aa-5f33-86d4-bc3bf2be168a}" Name="POU-ProcessRequest">
+      <JsonFileName>/Workflows/POU-ProcessRequest-D061B784-09AA-5F33-86D4-BC3BF2BE168A.json</JsonFileName>
+      <Type>1</Type><Subprocess>0</Subprocess><Category>5</Category><Mode>0</Mode><Scope>4</Scope><OnDemand>0</OnDemand>
+      <TriggerOnCreate>0</TriggerOnCreate><TriggerOnDelete>0</TriggerOnDelete><AsyncAutodelete>0</AsyncAutodelete><SyncWorkflowLogOnFailure>0</SyncWorkflowLogOnFailure>
+      <StateCode>0</StateCode><StatusCode>1</StatusCode><RunAs>1</RunAs><IsTransacted>1</IsTransacted><IntroducedVersion>1.0</IntroducedVersion>
+      <IsCustomizable>1</IsCustomizable><BusinessProcessType>0</BusinessProcessType><IsCustomProcessingStepAllowedForOtherPublishers>1</IsCustomProcessingStepAllowedForOtherPublishers>
+      <PrimaryEntity>none</PrimaryEntity>
+      <LocalizedNames><LocalizedName languagecode="1033" description="POU-ProcessRequest" /></LocalizedNames>
+    </Workflow>
+    <Workflow WorkflowId="{0677efb2-17a4-505e-a433-54daaff76c80}" Name="POU-Sweeper">
+      <JsonFileName>/Workflows/POU-Sweeper-0677EFB2-17A4-505E-A433-54DAAFF76C80.json</JsonFileName>
+      <Type>1</Type><Subprocess>0</Subprocess><Category>5</Category><Mode>0</Mode><Scope>4</Scope><OnDemand>0</OnDemand>
+      <TriggerOnCreate>0</TriggerOnCreate><TriggerOnDelete>0</TriggerOnDelete><AsyncAutodelete>0</AsyncAutodelete><SyncWorkflowLogOnFailure>0</SyncWorkflowLogOnFailure>
+      <StateCode>0</StateCode><StatusCode>1</StatusCode><RunAs>1</RunAs><IsTransacted>1</IsTransacted><IntroducedVersion>1.0</IntroducedVersion>
+      <IsCustomizable>1</IsCustomizable><BusinessProcessType>0</BusinessProcessType><IsCustomProcessingStepAllowedForOtherPublishers>1</IsCustomProcessingStepAllowedForOtherPublishers>
+      <PrimaryEntity>none</PrimaryEntity>
+      <LocalizedNames><LocalizedName languagecode="1033" description="POU-Sweeper" /></LocalizedNames>
+    </Workflow>
+    <Workflow WorkflowId="{80a788ee-927f-5a1a-89fd-38e04b0aa315}" Name="POU-Monitor">
+      <JsonFileName>/Workflows/POU-Monitor-80A788EE-927F-5A1A-89FD-38E04B0AA315.json</JsonFileName>
+      <Type>1</Type><Subprocess>0</Subprocess><Category>5</Category><Mode>0</Mode><Scope>4</Scope><OnDemand>0</OnDemand>
+      <TriggerOnCreate>0</TriggerOnCreate><TriggerOnDelete>0</TriggerOnDelete><AsyncAutodelete>0</AsyncAutodelete><SyncWorkflowLogOnFailure>0</SyncWorkflowLogOnFailure>
+      <StateCode>0</StateCode><StatusCode>1</StatusCode><RunAs>1</RunAs><IsTransacted>1</IsTransacted><IntroducedVersion>1.0</IntroducedVersion>
+      <IsCustomizable>1</IsCustomizable><BusinessProcessType>0</BusinessProcessType><IsCustomProcessingStepAllowedForOtherPublishers>1</IsCustomProcessingStepAllowedForOtherPublishers>
+      <PrimaryEntity>none</PrimaryEntity>
+      <LocalizedNames><LocalizedName languagecode="1033" description="POU-Monitor" /></LocalizedNames>
+    </Workflow>
+    <Workflow WorkflowId="{d5f17a88-2988-5512-a775-b1dc8cb1aa7b}" Name="POU-DailyLowStock">
+      <JsonFileName>/Workflows/POU-DailyLowStock-D5F17A88-2988-5512-A775-B1DC8CB1AA7B.json</JsonFileName>
+      <Type>1</Type><Subprocess>0</Subprocess><Category>5</Category><Mode>0</Mode><Scope>4</Scope><OnDemand>0</OnDemand>
+      <TriggerOnCreate>0</TriggerOnCreate><TriggerOnDelete>0</TriggerOnDelete><AsyncAutodelete>0</AsyncAutodelete><SyncWorkflowLogOnFailure>0</SyncWorkflowLogOnFailure>
+      <StateCode>0</StateCode><StatusCode>1</StatusCode><RunAs>1</RunAs><IsTransacted>1</IsTransacted><IntroducedVersion>1.0</IntroducedVersion>
+      <IsCustomizable>1</IsCustomizable><BusinessProcessType>0</BusinessProcessType><IsCustomProcessingStepAllowedForOtherPublishers>1</IsCustomProcessingStepAllowedForOtherPublishers>
+      <PrimaryEntity>none</PrimaryEntity>
+      <LocalizedNames><LocalizedName languagecode="1033" description="POU-DailyLowStock" /></LocalizedNames>
+    </Workflow>
+    <Workflow WorkflowId="{2eb95e57-60a9-5d1a-921a-eb8b5fda2952}" Name="POU-Reconcile">
+      <JsonFileName>/Workflows/POU-Reconcile-2EB95E57-60A9-5D1A-921A-EB8B5FDA2952.json</JsonFileName>
+      <Type>1</Type><Subprocess>0</Subprocess><Category>5</Category><Mode>0</Mode><Scope>4</Scope><OnDemand>0</OnDemand>
+      <TriggerOnCreate>0</TriggerOnCreate><TriggerOnDelete>0</TriggerOnDelete><AsyncAutodelete>0</AsyncAutodelete><SyncWorkflowLogOnFailure>0</SyncWorkflowLogOnFailure>
+      <StateCode>0</StateCode><StatusCode>1</StatusCode><RunAs>1</RunAs><IsTransacted>1</IsTransacted><IntroducedVersion>1.0</IntroducedVersion>
+      <IsCustomizable>1</IsCustomizable><BusinessProcessType>0</BusinessProcessType><IsCustomProcessingStepAllowedForOtherPublishers>1</IsCustomProcessingStepAllowedForOtherPublishers>
+      <PrimaryEntity>none</PrimaryEntity>
+      <LocalizedNames><LocalizedName languagecode="1033" description="POU-Reconcile" /></LocalizedNames>
+    </Workflow>
+    <Workflow WorkflowId="{30d1e2f8-34d5-54e3-899e-f5f8cc76a258}" Name="POU-WeeklyHealth">
+      <JsonFileName>/Workflows/POU-WeeklyHealth-30D1E2F8-34D5-54E3-899E-F5F8CC76A258.json</JsonFileName>
+      <Type>1</Type><Subprocess>0</Subprocess><Category>5</Category><Mode>0</Mode><Scope>4</Scope><OnDemand>0</OnDemand>
+      <TriggerOnCreate>0</TriggerOnCreate><TriggerOnDelete>0</TriggerOnDelete><AsyncAutodelete>0</AsyncAutodelete><SyncWorkflowLogOnFailure>0</SyncWorkflowLogOnFailure>
+      <StateCode>0</StateCode><StatusCode>1</StatusCode><RunAs>1</RunAs><IsTransacted>1</IsTransacted><IntroducedVersion>1.0</IntroducedVersion>
+      <IsCustomizable>1</IsCustomizable><BusinessProcessType>0</BusinessProcessType><IsCustomProcessingStepAllowedForOtherPublishers>1</IsCustomProcessingStepAllowedForOtherPublishers>
+      <PrimaryEntity>none</PrimaryEntity>
+      <LocalizedNames><LocalizedName languagecode="1033" description="POU-WeeklyHealth" /></LocalizedNames>
+    </Workflow>
+    <Workflow WorkflowId="{b6df0374-4e80-5afa-a548-8cde46c96986}" Name="POU-WeeklyUsage">
+      <JsonFileName>/Workflows/POU-WeeklyUsage-B6DF0374-4E80-5AFA-A548-8CDE46C96986.json</JsonFileName>
+      <Type>1</Type><Subprocess>0</Subprocess><Category>5</Category><Mode>0</Mode><Scope>4</Scope><OnDemand>0</OnDemand>
+      <TriggerOnCreate>0</TriggerOnCreate><TriggerOnDelete>0</TriggerOnDelete><AsyncAutodelete>0</AsyncAutodelete><SyncWorkflowLogOnFailure>0</SyncWorkflowLogOnFailure>
+      <StateCode>0</StateCode><StatusCode>1</StatusCode><RunAs>1</RunAs><IsTransacted>1</IsTransacted><IntroducedVersion>1.0</IntroducedVersion>
+      <IsCustomizable>1</IsCustomizable><BusinessProcessType>0</BusinessProcessType><IsCustomProcessingStepAllowedForOtherPublishers>1</IsCustomProcessingStepAllowedForOtherPublishers>
+      <PrimaryEntity>none</PrimaryEntity>
+      <LocalizedNames><LocalizedName languagecode="1033" description="POU-WeeklyUsage" /></LocalizedNames>
+    </Workflow>
+  </Workflows>
+  <FieldSecurityProfiles />
+  <Templates />
+  <EntityMaps />
+  <EntityRelationships />
+  <OrganizationSettings />
+  <optionsets />
+  <CustomControls />
+  <EntityDataProviders />
+  <connectionreferences>
+    <connectionreference connectionreferencelogicalname="pou_sharedsharepointonline_pou">
+      <connectionreferencedisplayname>SharePoint</connectionreferencedisplayname>
+      <connectorid>/providers/Microsoft.PowerApps/apis/shared_sharepointonline</connectorid>
+      <iscustomizable>1</iscustomizable><statecode>0</statecode><statuscode>1</statuscode>
+    </connectionreference>
+    <connectionreference connectionreferencelogicalname="pou_sharedoffice365_pou">
+      <connectionreferencedisplayname>Office 365 Outlook</connectionreferencedisplayname>
+      <connectorid>/providers/Microsoft.PowerApps/apis/shared_office365</connectorid>
+      <iscustomizable>1</iscustomizable><statecode>0</statecode><statuscode>1</statuscode>
+    </connectionreference>
+  </connectionreferences>
+  <Languages><Language>1033</Language></Languages>
+</ImportExportXml>

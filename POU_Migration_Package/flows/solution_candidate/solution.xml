@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ImportExportXml version="9.2.0.0" SolutionPackageVersion="9.2" languagecode="1033" generatedBy="POU-Migration-Package" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <SolutionManifest>
+    <UniqueName>POUInventoryFlows</UniqueName>
+    <LocalizedNames><LocalizedName description="POU Inventory Flows" languagecode="1033" /></LocalizedNames>
+    <Descriptions />
+    <Version>1.0.0.0</Version>
+    <Managed>0</Managed>
+    <Publisher>
+      <UniqueName>pouinventory</UniqueName>
+      <LocalizedNames><LocalizedName description="POU Inventory" languagecode="1033" /></LocalizedNames>
+      <Descriptions />
+      <EMailAddress xsi:nil="true" /><SupportingWebsiteUrl xsi:nil="true" />
+      <CustomizationPrefix>pou</CustomizationPrefix>
+      <CustomizationOptionValuePrefix>74291</CustomizationOptionValuePrefix>
+      <Addresses />
+    </Publisher>
+    <RootComponents>
+      <RootComponent type="29" id="{5ee8979e-38a9-53ed-869b-2ec19a577a09}" behavior="0" />
+      <RootComponent type="29" id="{d061b784-09aa-5f33-86d4-bc3bf2be168a}" behavior="0" />
+      <RootComponent type="29" id="{0677efb2-17a4-505e-a433-54daaff76c80}" behavior="0" />
+      <RootComponent type="29" id="{80a788ee-927f-5a1a-89fd-38e04b0aa315}" behavior="0" />
+      <RootComponent type="29" id="{d5f17a88-2988-5512-a775-b1dc8cb1aa7b}" behavior="0" />
+      <RootComponent type="29" id="{2eb95e57-60a9-5d1a-921a-eb8b5fda2952}" behavior="0" />
+      <RootComponent type="29" id="{30d1e2f8-34d5-54e3-899e-f5f8cc76a258}" behavior="0" />
+      <RootComponent type="29" id="{b6df0374-4e80-5afa-a548-8cde46c96986}" behavior="0" />
+    </RootComponents>
+    <MissingDependencies />
+  </SolutionManifest>
+</ImportExportXml>

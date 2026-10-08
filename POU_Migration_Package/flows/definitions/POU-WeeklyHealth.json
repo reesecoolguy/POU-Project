@@ -1,0 +1,1390 @@
+{
+  "name": "POU-WeeklyHealth",
+  "displayName": "POU - Weekly data-health check",
+  "description": "Hourly tick; once per week: orphans, parameters, roles, placeholders; repairs the denormalised ItemName.",
+  "connectionReferences": {
+    "shared_sharepointonline": {
+      "runtimeSource": "embedded",
+      "connection": {
+        "connectionReferenceLogicalName": "pou_sharedsharepointonline_pou"
+      },
+      "api": {
+        "name": "shared_sharepointonline"
+      }
+    },
+    "shared_office365": {
+      "runtimeSource": "embedded",
+      "connection": {
+        "connectionReferenceLogicalName": "pou_sharedoffice365_pou"
+      },
+      "api": {
+        "name": "shared_office365"
+      }
+    }
+  },
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "$connections": {
+        "defaultValue": {},
+        "type": "Object"
+      },
+      "$authentication": {
+        "defaultValue": {},
+        "type": "SecureObject"
+      }
+    },
+    "triggers": {
+      "Recurrence": {
+        "type": "Recurrence",
+        "recurrence": {
+          "frequency": "Hour",
+          "interval": 1
+        },
+        "metadata": {
+          "operationMetadataId": "00000000-0000-0000-0000-000000000000"
+        }
+      }
+    },
+    "actions": {
+      "Cfg_SiteUrl": {
+        "type": "Compose",
+        "inputs": "https://CHANGE-ME.sharepoint.com/sites/POU",
+        "runAfter": {}
+      },
+      "Guard_site_url_configured": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@contains(outputs('Cfg_SiteUrl'), 'CHANGE-ME')",
+            true
+          ]
+        },
+        "actions": {
+          "Stop_site_url_not_set": {
+            "type": "Terminate",
+            "inputs": {
+              "runStatus": "Failed",
+              "runError": {
+                "code": "POU_CONFIG",
+                "message": "Edit the Cfg_SiteUrl action: it still contains CHANGE-ME."
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Cfg_SiteUrl": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Get_settings": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connectionName": "shared_sharepointonline",
+            "operationId": "HttpRequest",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+          },
+          "parameters": {
+            "dataset": "@outputs('Cfg_SiteUrl')",
+            "parameters/method": "GET",
+            "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSettings'')/items', '?', '$select=Id,SettingKey,SettingValue', '&', '$top=500')",
+            "parameters/headers": {
+              "Accept": "application/json;odata=verbose"
+            }
+          },
+          "authentication": "@parameters('$authentication')"
+        },
+        "runAfter": {
+          "Guard_site_url_configured": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Select_settings": {
+        "type": "Select",
+        "inputs": {
+          "from": "@body('Get_settings')?['d']?['results']",
+          "select": "@concat('\"', item()?['SettingKey'], '\":\"', replace(replace(coalesce(item()?['SettingValue'], ''), '\"', ''), '\\', '/'), '\"')"
+        },
+        "runAfter": {
+          "Get_settings": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Compose_Settings": {
+        "type": "Compose",
+        "inputs": "@json(concat('{', join(body('Select_settings'), ','), '}'))",
+        "runAfter": {
+          "Select_settings": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Compose_LocalDate": {
+        "type": "Compose",
+        "inputs": "@convertFromUtc(utcNow(), coalesce(outputs('Compose_Settings')?['DisplayTimeZoneWindows'], 'Central Standard Time'), 'yyyy-MM-dd')",
+        "runAfter": {
+          "Compose_Settings": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Compose_LocalHour": {
+        "type": "Compose",
+        "inputs": "@int(convertFromUtc(utcNow(), coalesce(outputs('Compose_Settings')?['DisplayTimeZoneWindows'], 'Central Standard Time'), 'HH'))",
+        "runAfter": {
+          "Compose_LocalDate": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Compose_LocalDow": {
+        "type": "Compose",
+        "inputs": "@toLower(convertFromUtc(utcNow(), coalesce(outputs('Compose_Settings')?['DisplayTimeZoneWindows'], 'Central Standard Time'), 'dddd'))",
+        "runAfter": {
+          "Compose_LocalHour": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Compose_Due": {
+        "type": "Compose",
+        "inputs": "@and(and(greaterOrEquals(outputs('Compose_LocalHour'), int(coalesce(outputs('Compose_Settings')?['WeeklyHourLocal'], '7'))), not(equals(coalesce(outputs('Compose_Settings')?['LastWeeklyHealthDate'], ''), outputs('Compose_LocalDate')))), equals(outputs('Compose_LocalDow'), toLower(coalesce(outputs('Compose_Settings')?['WeeklyDayOfWeek'], 'monday'))))",
+        "runAfter": {
+          "Compose_LocalDow": [
+            "Succeeded"
+          ]
+        }
+      },
+      "If_not_due": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@equals(outputs('Compose_Due'), false)",
+            true
+          ]
+        },
+        "actions": {
+          "Stop_not_due": {
+            "type": "Terminate",
+            "inputs": {
+              "runStatus": "Succeeded"
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Compose_Due": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Init_vItems": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "vItems",
+              "type": "array",
+              "value": []
+            }
+          ]
+        },
+        "runAfter": {
+          "If_not_due": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Init_vItemsNext": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "vItemsNext",
+              "type": "string",
+              "value": ""
+            }
+          ]
+        },
+        "runAfter": {
+          "Init_vItems": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Init_vStock": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "vStock",
+              "type": "array",
+              "value": []
+            }
+          ]
+        },
+        "runAfter": {
+          "Init_vItemsNext": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Init_vStockNext": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "vStockNext",
+              "type": "string",
+              "value": ""
+            }
+          ]
+        },
+        "runAfter": {
+          "Init_vStock": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Init_vFindings": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "vFindings",
+              "type": "array",
+              "value": []
+            }
+          ]
+        },
+        "runAfter": {
+          "Init_vStockNext": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Init_vNameFixed": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "vNameFixed",
+              "type": "integer",
+              "value": 0
+            }
+          ]
+        },
+        "runAfter": {
+          "Init_vFindings": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Items_reset_rows": {
+        "type": "SetVariable",
+        "inputs": {
+          "name": "vItems",
+          "value": []
+        },
+        "runAfter": {
+          "Init_vNameFixed": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Items_first_uri": {
+        "type": "SetVariable",
+        "inputs": {
+          "name": "vItemsNext",
+          "value": "@concat('/_api/web/lists/getbytitle(''POUItems'')/items?$top=500&$select=Id,ItemID,ItemName,Active')"
+        },
+        "runAfter": {
+          "Items_reset_rows": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Items_until": {
+        "type": "Until",
+        "expression": "@empty(variables('vItemsNext'))",
+        "limit": {
+          "count": 100,
+          "timeout": "PT1H"
+        },
+        "actions": {
+          "Items_page": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_sharepointonline",
+                "operationId": "HttpRequest",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+              },
+              "parameters": {
+                "dataset": "@outputs('Cfg_SiteUrl')",
+                "parameters/method": "GET",
+                "parameters/uri": "@variables('vItemsNext')",
+                "parameters/headers": {
+                  "Accept": "application/json;odata=verbose"
+                }
+              },
+              "authentication": "@parameters('$authentication')"
+            },
+            "runAfter": {}
+          },
+          "Items_append": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "vItems",
+              "value": "@union(variables('vItems'), coalesce(body('Items_page')?['d']?['results'], createArray()))"
+            },
+            "runAfter": {
+              "Items_page": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Items_next": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "vItemsNext",
+              "value": "@if(empty(coalesce(body('Items_page')?['d']?['__next'], '')), '', substring(body('Items_page')?['d']?['__next'], indexOf(body('Items_page')?['d']?['__next'], '/_api/')))"
+            },
+            "runAfter": {
+              "Items_append": [
+                "Succeeded"
+              ]
+            }
+          }
+        },
+        "runAfter": {
+          "Items_first_uri": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Stock_reset_rows": {
+        "type": "SetVariable",
+        "inputs": {
+          "name": "vStock",
+          "value": []
+        },
+        "runAfter": {
+          "Items_until": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Stock_first_uri": {
+        "type": "SetVariable",
+        "inputs": {
+          "name": "vStockNext",
+          "value": "@concat('/_api/web/lists/getbytitle(''POUStockLocations'')/items?$top=500&$select=Id,StockKey,ItemID,ItemName,OnHandQty,MinQty,MaxQty,BalanceStatus,Active')"
+        },
+        "runAfter": {
+          "Stock_reset_rows": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Stock_until": {
+        "type": "Until",
+        "expression": "@empty(variables('vStockNext'))",
+        "limit": {
+          "count": 100,
+          "timeout": "PT1H"
+        },
+        "actions": {
+          "Stock_page": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_sharepointonline",
+                "operationId": "HttpRequest",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+              },
+              "parameters": {
+                "dataset": "@outputs('Cfg_SiteUrl')",
+                "parameters/method": "GET",
+                "parameters/uri": "@variables('vStockNext')",
+                "parameters/headers": {
+                  "Accept": "application/json;odata=verbose"
+                }
+              },
+              "authentication": "@parameters('$authentication')"
+            },
+            "runAfter": {}
+          },
+          "Stock_append": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "vStock",
+              "value": "@union(variables('vStock'), coalesce(body('Stock_page')?['d']?['results'], createArray()))"
+            },
+            "runAfter": {
+              "Stock_page": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Stock_next": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "vStockNext",
+              "value": "@if(empty(coalesce(body('Stock_page')?['d']?['__next'], '')), '', substring(body('Stock_page')?['d']?['__next'], indexOf(body('Stock_page')?['d']?['__next'], '/_api/')))"
+            },
+            "runAfter": {
+              "Stock_append": [
+                "Succeeded"
+              ]
+            }
+          }
+        },
+        "runAfter": {
+          "Stock_first_uri": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Get_employees": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connectionName": "shared_sharepointonline",
+            "operationId": "HttpRequest",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+          },
+          "parameters": {
+            "dataset": "@outputs('Cfg_SiteUrl')",
+            "parameters/method": "GET",
+            "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUEmployees'')/items', '?', '$select=BadgeID,Active,Role,MicrosoftUPN', '&', '$top=500')",
+            "parameters/headers": {
+              "Accept": "application/json;odata=verbose"
+            }
+          },
+          "authentication": "@parameters('$authentication')"
+        },
+        "runAfter": {
+          "Stock_until": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Get_stations": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connectionName": "shared_sharepointonline",
+            "operationId": "HttpRequest",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+          },
+          "parameters": {
+            "dataset": "@outputs('Cfg_SiteUrl')",
+            "parameters/method": "GET",
+            "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUStations'')/items', '?', '$select=StationID,Active', '&', '$top=200')",
+            "parameters/headers": {
+              "Accept": "application/json;odata=verbose"
+            }
+          },
+          "authentication": "@parameters('$authentication')"
+        },
+        "runAfter": {
+          "Get_employees": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Select_item_ids": {
+        "type": "Select",
+        "inputs": {
+          "from": "@variables('vItems')",
+          "select": "@toUpper(item()?['ItemID'])"
+        },
+        "runAfter": {
+          "Get_stations": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Select_stock_item_ids": {
+        "type": "Select",
+        "inputs": {
+          "from": "@variables('vStock')",
+          "select": "@toUpper(item()?['ItemID'])"
+        },
+        "runAfter": {
+          "Select_item_ids": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Filter_orphan_stock": {
+        "type": "Query",
+        "inputs": {
+          "from": "@variables('vStock')",
+          "where": "@not(contains(body('Select_item_ids'), toUpper(item()?['ItemID'])))"
+        },
+        "runAfter": {
+          "Select_stock_item_ids": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Select_orphan_keys": {
+        "type": "Select",
+        "inputs": {
+          "from": "@body('Filter_orphan_stock')",
+          "select": "@item()?['StockKey']"
+        },
+        "runAfter": {
+          "Filter_orphan_stock": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "If_orphan_stock": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@greater(length(body('Filter_orphan_stock')), 0)",
+            true
+          ]
+        },
+        "actions": {
+          "Find_orphan_stock": {
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "vFindings",
+              "value": {
+                "severity": "Critical",
+                "area": "Stock record without item master",
+                "item": "@join(take(body('Select_orphan_keys'), 20), ', ')",
+                "detail": "@concat(string(length(body('Filter_orphan_stock'))), ' stock record(s) have an ItemID missing from POUItems.')"
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Select_orphan_keys": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Filter_items_without_stock": {
+        "type": "Query",
+        "inputs": {
+          "from": "@variables('vItems')",
+          "where": "@and(equals(item()?['Active'], true), not(contains(body('Select_stock_item_ids'), toUpper(item()?['ItemID']))))"
+        },
+        "runAfter": {
+          "If_orphan_stock": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Select_items_without_stock": {
+        "type": "Select",
+        "inputs": {
+          "from": "@body('Filter_items_without_stock')",
+          "select": "@item()?['ItemID']"
+        },
+        "runAfter": {
+          "Filter_items_without_stock": [
+            "Succeeded"
+          ]
+        }
+      },
+      "If_items_without_stock": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@greater(length(body('Filter_items_without_stock')), 0)",
+            true
+          ]
+        },
+        "actions": {
+          "Find_items_without_stock": {
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "vFindings",
+              "value": {
+                "severity": "Warning",
+                "area": "Active item with no stock location",
+                "item": "@join(take(body('Select_items_without_stock'), 20), ', ')",
+                "detail": "@concat(string(length(body('Filter_items_without_stock'))), ' active item(s) have no stocking location.')"
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Select_items_without_stock": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "For_each_stock": {
+        "type": "Foreach",
+        "foreach": "@variables('vStock')",
+        "actions": {
+          "Filter_item_for_stock": {
+            "type": "Query",
+            "inputs": {
+              "from": "@variables('vItems')",
+              "where": "@equals(toUpper(item()?['ItemID']), toUpper(items('For_each_stock')?['ItemID']))"
+            },
+            "runAfter": {}
+          },
+          "Compose_master_name": {
+            "type": "Compose",
+            "inputs": "@first(body('Filter_item_for_stock'))?['ItemName']",
+            "runAfter": {
+              "Filter_item_for_stock": [
+                "Succeeded"
+              ]
+            }
+          },
+          "If_name_differs": {
+            "type": "If",
+            "expression": {
+              "equals": [
+                "@and(not(equals(outputs('Compose_master_name'), null)), not(equals(coalesce(items('For_each_stock')?['ItemName'], ''), outputs('Compose_master_name'))))",
+                true
+              ]
+            },
+            "actions": {
+              "Fix_name": {
+                "type": "ApiConnection",
+                "inputs": {
+                  "host": {
+                    "connectionName": "shared_sharepointonline",
+                    "operationId": "HttpRequest",
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                  },
+                  "parameters": {
+                    "dataset": "@outputs('Cfg_SiteUrl')",
+                    "parameters/method": "POST",
+                    "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUStockLocations'')/items(', items('For_each_stock')?['Id'], ')')",
+                    "parameters/headers": {
+                      "Accept": "application/json;odata=verbose",
+                      "Content-Type": "application/json;odata=verbose",
+                      "X-HTTP-Method": "MERGE",
+                      "IF-MATCH": "@items('For_each_stock')?['__metadata']?['etag']"
+                    },
+                    "parameters/body": {
+                      "__metadata": {
+                        "type": "SP.Data.POUStockLocationsListItem"
+                      },
+                      "ItemName": "@outputs('Compose_master_name')"
+                    }
+                  },
+                  "authentication": "@parameters('$authentication')"
+                },
+                "runAfter": {}
+              },
+              "If_name_fixed": {
+                "type": "If",
+                "expression": {
+                  "equals": [
+                    "@equals(actions('Fix_name')?['status'], 'Succeeded')",
+                    true
+                  ]
+                },
+                "actions": {
+                  "Count_name_fixed": {
+                    "type": "IncrementVariable",
+                    "inputs": {
+                      "name": "vNameFixed",
+                      "value": 1
+                    },
+                    "runAfter": {}
+                  }
+                },
+                "else": {
+                  "actions": {}
+                },
+                "runAfter": {
+                  "Fix_name": [
+                    "Succeeded",
+                    "Failed",
+                    "Skipped",
+                    "TimedOut"
+                  ]
+                }
+              }
+            },
+            "else": {
+              "actions": {}
+            },
+            "runAfter": {
+              "Compose_master_name": [
+                "Succeeded"
+              ]
+            }
+          }
+        },
+        "runtimeConfiguration": {
+          "concurrency": {
+            "repetitions": 1
+          }
+        },
+        "runAfter": {
+          "If_items_without_stock": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Filter_onhand_above_max": {
+        "type": "Query",
+        "inputs": {
+          "from": "@variables('vStock')",
+          "where": "@and(equals(item()?['Active'], true), not(equals(item()?['OnHandQty'], null)), greater(coalesce(item()?['OnHandQty'], 0), coalesce(item()?['MaxQty'], 0)))"
+        },
+        "runAfter": {
+          "For_each_stock": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Filter_min_gt_max": {
+        "type": "Query",
+        "inputs": {
+          "from": "@variables('vStock')",
+          "where": "@and(equals(item()?['Active'], true), greater(coalesce(item()?['MinQty'], 0), coalesce(item()?['MaxQty'], 0)))"
+        },
+        "runAfter": {
+          "Filter_onhand_above_max": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Filter_max_zero": {
+        "type": "Query",
+        "inputs": {
+          "from": "@variables('vStock')",
+          "where": "@and(equals(item()?['Active'], true), equals(coalesce(item()?['MaxQty'], 0), 0))"
+        },
+        "runAfter": {
+          "Filter_min_gt_max": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Filter_no_balance": {
+        "type": "Query",
+        "inputs": {
+          "from": "@variables('vStock')",
+          "where": "@and(equals(item()?['Active'], true), equals(item()?['BalanceStatus'], 'NoBalance'))"
+        },
+        "runAfter": {
+          "Filter_max_zero": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Select_onhand_above_max_keys": {
+        "type": "Select",
+        "inputs": {
+          "from": "@body('Filter_onhand_above_max')",
+          "select": "@item()?['StockKey']"
+        },
+        "runAfter": {
+          "Filter_no_balance": [
+            "Succeeded"
+          ]
+        }
+      },
+      "If_onhand_above_max": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@greater(length(body('Filter_onhand_above_max')), 0)",
+            true
+          ]
+        },
+        "actions": {
+          "Find_onhand_above_max": {
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "vFindings",
+              "value": {
+                "severity": "Info",
+                "area": "On hand above Max",
+                "item": "@join(take(body('Select_onhand_above_max_keys'), 15), ', ')",
+                "detail": "@concat(string(length(body('Filter_onhand_above_max'))), ' record(s) hold more than Max (not capped; review at next count).')"
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Select_onhand_above_max_keys": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Select_min_gt_max_keys": {
+        "type": "Select",
+        "inputs": {
+          "from": "@body('Filter_min_gt_max')",
+          "select": "@item()?['StockKey']"
+        },
+        "runAfter": {
+          "If_onhand_above_max": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "If_min_gt_max": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@greater(length(body('Filter_min_gt_max')), 0)",
+            true
+          ]
+        },
+        "actions": {
+          "Find_min_gt_max": {
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "vFindings",
+              "value": {
+                "severity": "Warning",
+                "area": "Min above Max",
+                "item": "@join(take(body('Select_min_gt_max_keys'), 15), ', ')",
+                "detail": "@concat(string(length(body('Filter_min_gt_max'))), ' record(s) have Min greater than Max.')"
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Select_min_gt_max_keys": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Select_max_zero_keys": {
+        "type": "Select",
+        "inputs": {
+          "from": "@body('Filter_max_zero')",
+          "select": "@item()?['StockKey']"
+        },
+        "runAfter": {
+          "If_min_gt_max": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "If_max_zero": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@greater(length(body('Filter_max_zero')), 0)",
+            true
+          ]
+        },
+        "actions": {
+          "Find_max_zero": {
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "vFindings",
+              "value": {
+                "severity": "Warning",
+                "area": "Max is zero",
+                "item": "@join(take(body('Select_max_zero_keys'), 15), ', ')",
+                "detail": "@concat(string(length(body('Filter_max_zero'))), ' record(s) have Max = 0 so suggested order is always 0.')"
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Select_max_zero_keys": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Select_no_balance_keys": {
+        "type": "Select",
+        "inputs": {
+          "from": "@body('Filter_no_balance')",
+          "select": "@item()?['StockKey']"
+        },
+        "runAfter": {
+          "If_max_zero": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "If_no_balance": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@greater(length(body('Filter_no_balance')), 0)",
+            true
+          ]
+        },
+        "actions": {
+          "Find_no_balance": {
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "vFindings",
+              "value": {
+                "severity": "Warning",
+                "area": "No verified balance",
+                "item": "@join(take(body('Select_no_balance_keys'), 15), ', ')",
+                "detail": "@concat(string(length(body('Filter_no_balance'))), ' record(s) have no counted quantity: they cannot be issued or received until a supervisor counts them.')"
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Select_no_balance_keys": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Filter_approvers": {
+        "type": "Query",
+        "inputs": {
+          "from": "@body('Get_employees')?['d']?['results']",
+          "where": "@and(equals(item()?['Active'], true), not(equals(item()?['Role'], 'Operator')), not(empty(coalesce(item()?['MicrosoftUPN'], ''))))"
+        },
+        "runAfter": {
+          "If_no_balance": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "If_no_approvers": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@equals(length(body('Filter_approvers')), 0)",
+            true
+          ]
+        },
+        "actions": {
+          "Find_no_approvers": {
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "vFindings",
+              "value": {
+                "severity": "Critical",
+                "area": "Nobody can approve",
+                "item": "(all)",
+                "detail": "No Active Supervisor/Admin has a MicrosoftUPN, so audits, new items and adjustments can never be approved."
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Filter_approvers": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Select_approver_upns": {
+        "type": "Select",
+        "inputs": {
+          "from": "@body('Filter_approvers')",
+          "select": "@toLower(item()?['MicrosoftUPN'])"
+        },
+        "runAfter": {
+          "If_no_approvers": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "If_duplicate_upns": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@greater(length(body('Select_approver_upns')), length(union(body('Select_approver_upns'), createArray())))",
+            true
+          ]
+        },
+        "actions": {
+          "Find_duplicate_upns": {
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "vFindings",
+              "value": {
+                "severity": "Warning",
+                "area": "Duplicate MicrosoftUPN",
+                "item": "(employees)",
+                "detail": "Two approvers share the same Microsoft account."
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Select_approver_upns": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Filter_active_stations": {
+        "type": "Query",
+        "inputs": {
+          "from": "@body('Get_stations')?['d']?['results']",
+          "where": "@equals(item()?['Active'], true)"
+        },
+        "runAfter": {
+          "If_duplicate_upns": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "If_no_stations": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@equals(length(body('Filter_active_stations')), 0)",
+            true
+          ]
+        },
+        "actions": {
+          "Find_no_stations": {
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "vFindings",
+              "value": {
+                "severity": "Critical",
+                "area": "No active station",
+                "item": "(all)",
+                "detail": "No station is Active in POUStations; every login will be refused."
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Filter_active_stations": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Filter_placeholder_settings": {
+        "type": "Query",
+        "inputs": {
+          "from": "@body('Get_settings')?['d']?['results']",
+          "where": "@contains(coalesce(item()?['SettingValue'], ''), 'CHANGE-ME')"
+        },
+        "runAfter": {
+          "If_no_stations": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Select_placeholder_keys": {
+        "type": "Select",
+        "inputs": {
+          "from": "@body('Filter_placeholder_settings')",
+          "select": "@item()?['SettingKey']"
+        },
+        "runAfter": {
+          "Filter_placeholder_settings": [
+            "Succeeded"
+          ]
+        }
+      },
+      "If_placeholders": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@greater(length(body('Filter_placeholder_settings')), 0)",
+            true
+          ]
+        },
+        "actions": {
+          "Find_placeholders": {
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "vFindings",
+              "value": {
+                "severity": "Warning",
+                "area": "Settings still placeholders",
+                "item": "@join(body('Select_placeholder_keys'), ', ')",
+                "detail": "Report recipients are not configured, so reports are not being emailed."
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Select_placeholder_keys": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Compose_summary": {
+        "type": "Compose",
+        "inputs": "@concat(string(length(variables('vStock'))), ' stock records, ', string(length(variables('vItems'))), ' items checked; ', string(variables('vNameFixed')), ' item name(s) repaired; ', string(length(variables('vFindings'))), ' finding(s)')",
+        "runAfter": {
+          "If_placeholders": [
+            "Succeeded",
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        }
+      },
+      "Table_findings": {
+        "type": "Table",
+        "inputs": {
+          "from": "@variables('vFindings')",
+          "format": "HTML",
+          "columns": [
+            {
+              "header": "Severity",
+              "value": "@item()?['severity']"
+            },
+            {
+              "header": "Area",
+              "value": "@item()?['area']"
+            },
+            {
+              "header": "Item(s)",
+              "value": "@item()?['item']"
+            },
+            {
+              "header": "Detail",
+              "value": "@item()?['detail']"
+            }
+          ]
+        },
+        "runAfter": {
+          "Compose_summary": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Send_health_email_if_recipients": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@and(not(empty(coalesce(outputs('Compose_Settings')?['ReportRecipientsDataHealth'], ''))), not(contains(coalesce(outputs('Compose_Settings')?['ReportRecipientsDataHealth'], ''), 'CHANGE-ME')))",
+            true
+          ]
+        },
+        "actions": {
+          "Send_health_email": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_office365",
+                "operationId": "SendEmailV2",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+              },
+              "parameters": {
+                "emailMessage/To": "@replace(coalesce(outputs('Compose_Settings')?['ReportRecipientsDataHealth'], ''), ',', ';')",
+                "emailMessage/Subject": "@concat('POU weekly data health ', outputs('Compose_LocalDate'), ': ', outputs('Compose_summary'))",
+                "emailMessage/Body": "@concat('<html><body style=''font-family:Segoe UI,Arial,sans-serif;font-size:13px''><h3>POU weekly data-health report</h3><p>Counts and findings from the whole item master and stock-location list.</p>', '<h4>Findings</h4>', body('Table_findings'), '<p style=\"color:#555\">Nothing is changed by this report except repairing the denormalised ItemName on stock records.</p></body></html>')",
+                "emailMessage/Importance": "Normal"
+              },
+              "authentication": "@parameters('$authentication')"
+            },
+            "runAfter": {}
+          },
+          "Send_health_email_if_sent": {
+            "type": "If",
+            "expression": {
+              "equals": [
+                "@equals(actions('Send_health_email')?['status'], 'Succeeded')",
+                true
+              ]
+            },
+            "actions": {
+              "Find_setting_LastWeeklyHealthDate": {
+                "type": "Query",
+                "inputs": {
+                  "from": "@body('Get_settings')?['d']?['results']",
+                  "where": "@equals(item()?['SettingKey'], 'LastWeeklyHealthDate')"
+                },
+                "runAfter": {}
+              },
+              "Save_setting_LastWeeklyHealthDate": {
+                "type": "ApiConnection",
+                "inputs": {
+                  "host": {
+                    "connectionName": "shared_sharepointonline",
+                    "operationId": "HttpRequest",
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                  },
+                  "parameters": {
+                    "dataset": "@outputs('Cfg_SiteUrl')",
+                    "parameters/method": "POST",
+                    "parameters/uri": "@concat('/_api/web/lists/getbytitle(''POUSettings'')/items(', first(body('Find_setting_LastWeeklyHealthDate'))?['Id'], ')')",
+                    "parameters/headers": {
+                      "Accept": "application/json;odata=verbose",
+                      "Content-Type": "application/json;odata=verbose",
+                      "X-HTTP-Method": "MERGE",
+                      "IF-MATCH": "*"
+                    },
+                    "parameters/body": {
+                      "__metadata": {
+                        "type": "SP.Data.POUSettingsListItem"
+                      },
+                      "SettingValue": "@outputs('Compose_LocalDate')"
+                    }
+                  },
+                  "authentication": "@parameters('$authentication')"
+                },
+                "runAfter": {
+                  "Find_setting_LastWeeklyHealthDate": [
+                    "Succeeded"
+                  ]
+                }
+              }
+            },
+            "else": {
+              "actions": {}
+            },
+            "runAfter": {
+              "Send_health_email": [
+                "Succeeded",
+                "Failed",
+                "Skipped",
+                "TimedOut"
+              ]
+            }
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Table_findings": [
+            "Succeeded"
+          ]
+        }
+      }
+    }
+  }
+}
