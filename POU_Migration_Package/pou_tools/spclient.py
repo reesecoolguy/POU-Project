@@ -124,6 +124,13 @@ class SpClient:
         return self.request("POST", "web/lists", {"__metadata": {"type": "SP.List"}, "BaseTemplate": 100,
                                                   "Title": title, "Description": description})["d"]
 
+    def delete_list(self, title: str):
+        self.request("DELETE", self._lp(title), None, {"IF-MATCH": "*"})
+
+    def effective_permissions(self, title: str) -> int:
+        d = self.request("GET", self._lp(title) + "/EffectiveBasePermissions")["d"]["EffectiveBasePermissions"]
+        return (int(d["High"]) << 32) | int(d["Low"])
+
     def update_list(self, title: str, props: dict):
         self.request("MERGE", self._lp(title), {"__metadata": {"type": "SP.List"}, **props}, {"IF-MATCH": "*"})
 

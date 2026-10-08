@@ -522,6 +522,10 @@ class FakeSharePoint:
             if method == "GET":
                 self._need(caller, fl, "ViewListItems")
                 return 200, {}, {"d": self._list_json(fl)}
+            if method == "DELETE":
+                self._need(caller, fl, "ManageLists")
+                del self.lists[fl.title]
+                return 200, {}, None
             if method == "MERGE":
                 self._need(caller, fl, "ManageLists")
                 for k, v in data.items():
@@ -534,6 +538,12 @@ class FakeSharePoint:
                     else:
                         raise SPHttp(400, "-1", f"unknown list property {k}")
                 return 204, {}, None
+        if rest == "/EffectiveBasePermissions" and method == "GET":
+            m = self.effective_mask(caller, fl)
+            if not (m & masks.FLAGS["ViewListItems"]):
+                raise SPHttp(403, "-2147024891, System.UnauthorizedAccessException", "Access denied.")
+            sp = masks.split(m)
+            return 200, {}, {"d": {"EffectiveBasePermissions": {"High": str(sp["High"]), "Low": str(sp["Low"])}}}
         # fields
         if rest.startswith("/fields"):
             return self._route_fields(ctx, caller, fl, rest[len("/fields"):], data)
