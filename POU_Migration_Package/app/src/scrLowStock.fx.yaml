@@ -1,0 +1,323 @@
+scrLowStock As screen:
+    Fill: =RGBA(242, 242, 242, 1)
+    OnVisible: |-
+        =If(IsBlank(varSession) And Not(varSupMode), Navigate(scrLogin, ScreenTransition.None));
+        Set(varLastActivity, Now());
+        Reset(txtFilterLow)
+    recHdrLow As rectangle:
+        X: =0
+        Y: =0
+        Width: =1366
+        Height: =64
+        Fill: =RGBA(31, 56, 100, 1)
+    lblHdrStationLow As label:
+        X: =12
+        Y: =4
+        Width: =260
+        Height: =28
+        Text: ="Station " & varStation
+        Size: =16
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    lblHdrUserLow As label:
+        X: =12
+        Y: =32
+        Width: =560
+        Height: =28
+        Text: =If(varSupMode, varEmpName & " (supervisor, signed in as " & User().Email & ")", varEmpName & " - badge session")
+        Size: =14
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Normal
+        Wrap: =true
+        AutoHeight: =false
+    lblHdrIdleLow As label:
+        X: =1040
+        Y: =4
+        Width: =200
+        Height: =24
+        Text: ="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+        Size: =12
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Right
+        FontWeight: =FontWeight.Normal
+        Wrap: =true
+        AutoHeight: =false
+    btnHdrOutLow As button:
+        X: =1250
+        Y: =12
+        Width: =104
+        Height: =40
+        Text: ="Sign out"
+        OnSelect: |-
+            =If(
+                Not(IsBlank(varSession)),
+                IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
+            );
+            Set(varSession, "");
+            Set(varEmpName, "");
+            Set(varRole, "");
+            Set(varSupMode, false);
+            Clear(colStock);
+            Navigate(scrLogin, ScreenTransition.None)
+        Fill: =RGBA(192, 80, 77, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(192, 80, 77, 1), -15%)
+        PressedFill: =ColorFade(RGBA(192, 80, 77, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+    tmrIdleLow As timer:
+        X: =0
+        Y: =0
+        Width: =6
+        Height: =6
+        Duration: =1000
+        Repeat: =true
+        AutoStart: =false
+        Start: =true
+        OnTimerEnd: |-
+            =Set(varTick, Now());
+            If(
+                (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+                If(
+                    Not(IsBlank(varSession)),
+                    IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
+                );
+                Set(varSession, "");
+                Set(varEmpName, "");
+                Set(varRole, "");
+                Set(varSupMode, false);
+                Clear(colStock);
+                Navigate(scrLogin, ScreenTransition.None)
+            )
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(0, 0, 0, 0)
+        BorderThickness: =0
+        BorderColor: =RGBA(0, 0, 0, 0)
+        DisplayMode: =DisplayMode.View
+    btnNavScanLow As button:
+        X: =580
+        Y: =18
+        Width: =110
+        Height: =36
+        Text: ="Add / Remove"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrScan, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =Not(varSupMode)
+    btnNavAuditLow As button:
+        X: =695
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="Count"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrAudit, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavAddItemLow As button:
+        X: =800
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="New item"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrAddItem, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavLowLow As button:
+        X: =905
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="Low stock"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrLowStock, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavHistLow As button:
+        X: =1010
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="History"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrHistory, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavSupLow As button:
+        X: =1115
+        Y: =18
+        Width: =110
+        Height: =36
+        Text: ="Supervisor"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrSupervisor, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =varSupMode
+    btnNavAdminLow As button:
+        X: =1230
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="Admin"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrAdmin, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =varSupMode
+    lblLowTitleLow As label:
+        X: =24
+        Y: =76
+        Width: =1000
+        Height: =30
+        Text: ="Low stock (On hand <= Min by default; the rule is the central LowStockRule setting)"
+        Size: =18
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    txtFilterLow As text:
+        X: =24
+        Y: =112
+        Width: =360
+        Height: =44
+        HintText: ="Filter: item number starts with..."
+        Default: =""
+        Size: =18
+        OnChange: =Set(varLastActivity, Now())
+        DelayOutput: =false
+        TabIndex: =1
+    lblLowCountLow As label:
+        X: =400
+        Y: =112
+        Width: =940
+        Height: =44
+        Text: =CountRows(galLowLow.AllItems) & " shown" & If(CountRows(galLowLow.AllItems) >= varRowLimit, "  -  LIST MAY BE TRUNCATED at the app row limit of " & varRowLimit & ". The emailed low-stock report is complete.", "")
+        Size: =14
+        Color: =RGBA(156, 87, 0, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    lblLowHeadLow As label:
+        X: =24
+        Y: =164
+        Width: =1300
+        Height: =30
+        Text: ="Item                         Location        On hand   Min   Max   Suggested (Max - On hand)"
+        Size: =14
+        Color: =RGBA(110, 110, 110, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    galLowLow As gallery.galleryVertical:
+        X: =24
+        Y: =196
+        Width: =1318
+        Height: =530
+        TemplateSize: =48
+        Items: =FirstN(SortByColumns(Filter(POUStockLocations, Active = true, LowStockFlag = true, StartsWith(ItemID, Upper(Trim(Substitute(txtFilterLow.Text, "*", ""))))), "ItemID", SortOrder.Ascending), varRowLimit)
+        TemplateFill: =If(Mod(ThisItem.ID, 2) = 0, RGBA(255, 255, 255, 1), RGBA(247, 247, 247, 1))
+        lblLowRowLow As label:
+            X: =8
+            Y: =6
+            Width: =1300
+            Height: =36
+            Text: =ThisItem.ItemID & "   " & ThisItem.ItemName & "   |   " & ThisItem.LocationCode & "   |   on hand " & Coalesce(Text(ThisItem.OnHandQty), "-") & "   min " & Coalesce(Text(ThisItem.MinQty), "-") & "   max " & Coalesce(Text(ThisItem.MaxQty), "-") & "   |   suggest " & If(IsBlank(ThisItem.OnHandQty) Or IsBlank(ThisItem.MaxQty), "-", Max(0, ThisItem.MaxQty - ThisItem.OnHandQty))
+            Size: =15
+            Color: =RGBA(32, 32, 32, 1)
+            Fill: =RGBA(0, 0, 0, 0)
+            Align: =Align.Left
+            FontWeight: =FontWeight.Normal
+            Wrap: =true
+            AutoHeight: =false
+    lblLowNoteLow As label:
+        X: =24
+        Y: =730
+        Width: =1000
+        Height: =28
+        Text: ="Suggestions only - they do NOT consider open purchase orders. No order is created."
+        Size: =12
+        Color: =RGBA(110, 110, 110, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Normal
+        Wrap: =true
+        AutoHeight: =false

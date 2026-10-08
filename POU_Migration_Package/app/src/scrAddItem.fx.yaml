@@ -1,0 +1,757 @@
+scrAddItem As screen:
+    Fill: =RGBA(242, 242, 242, 1)
+    OnVisible: |-
+        =If(IsBlank(varSession) And Not(varSupMode), Navigate(scrLogin, ScreenTransition.None));
+        Set(varLastActivity, Now());
+        UpdateContext({locMode: "ITEM_CREATE"});
+        SetFocus(txtItemIdAddItem)
+    recHdrAddItem As rectangle:
+        X: =0
+        Y: =0
+        Width: =1366
+        Height: =64
+        Fill: =RGBA(31, 56, 100, 1)
+    lblHdrStationAddItem As label:
+        X: =12
+        Y: =4
+        Width: =260
+        Height: =28
+        Text: ="Station " & varStation
+        Size: =16
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    lblHdrUserAddItem As label:
+        X: =12
+        Y: =32
+        Width: =560
+        Height: =28
+        Text: =If(varSupMode, varEmpName & " (supervisor, signed in as " & User().Email & ")", varEmpName & " - badge session")
+        Size: =14
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Normal
+        Wrap: =true
+        AutoHeight: =false
+    lblHdrIdleAddItem As label:
+        X: =1040
+        Y: =4
+        Width: =200
+        Height: =24
+        Text: ="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+        Size: =12
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Right
+        FontWeight: =FontWeight.Normal
+        Wrap: =true
+        AutoHeight: =false
+    btnHdrOutAddItem As button:
+        X: =1250
+        Y: =12
+        Width: =104
+        Height: =40
+        Text: ="Sign out"
+        OnSelect: |-
+            =If(
+                Not(IsBlank(varSession)),
+                IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
+            );
+            Set(varSession, "");
+            Set(varEmpName, "");
+            Set(varRole, "");
+            Set(varSupMode, false);
+            Clear(colStock);
+            Navigate(scrLogin, ScreenTransition.None)
+        Fill: =RGBA(192, 80, 77, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(192, 80, 77, 1), -15%)
+        PressedFill: =ColorFade(RGBA(192, 80, 77, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+    tmrIdleAddItem As timer:
+        X: =0
+        Y: =0
+        Width: =6
+        Height: =6
+        Duration: =1000
+        Repeat: =true
+        AutoStart: =false
+        Start: =true
+        OnTimerEnd: |-
+            =Set(varTick, Now());
+            If(
+                (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+                If(
+                    Not(IsBlank(varSession)),
+                    IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
+                );
+                Set(varSession, "");
+                Set(varEmpName, "");
+                Set(varRole, "");
+                Set(varSupMode, false);
+                Clear(colStock);
+                Navigate(scrLogin, ScreenTransition.None)
+            )
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(0, 0, 0, 0)
+        BorderThickness: =0
+        BorderColor: =RGBA(0, 0, 0, 0)
+        DisplayMode: =DisplayMode.View
+    btnNavScanAddItem As button:
+        X: =580
+        Y: =18
+        Width: =110
+        Height: =36
+        Text: ="Add / Remove"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrScan, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =Not(varSupMode)
+    btnNavAuditAddItem As button:
+        X: =695
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="Count"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrAudit, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavAddItemAddItem As button:
+        X: =800
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="New item"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrAddItem, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavLowAddItem As button:
+        X: =905
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="Low stock"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrLowStock, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavHistAddItem As button:
+        X: =1010
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="History"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrHistory, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavSupAddItem As button:
+        X: =1115
+        Y: =18
+        Width: =110
+        Height: =36
+        Text: ="Supervisor"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrSupervisor, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =varSupMode
+    btnNavAdminAddItem As button:
+        X: =1230
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="Admin"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrAdmin, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =varSupMode
+    btnRunAddItem As button:
+        X: =8
+        Y: =8
+        Width: =6
+        Height: =6
+        Text: =""
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(0, 0, 0, 0)
+        BorderThickness: =0
+        OnSelect: |-
+            =If(
+                IsBlank(varReq) Or varBusy,
+                false,
+                Set(varBusy, true);
+            Set(varOutKind, "");
+            Set(varOutText, "");
+            Set(varLookupFailed, false);
+            Set(varFound, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Set(varLookupFailed, true); Blank()));
+            Set(varSent, Not(IsBlank(varFound)));
+            If(
+                Not(varSent) And Not(varLookupFailed),
+                Set(varCreateFailed, false);
+                IfError(Patch(POURequests, Defaults(POURequests), {
+                    Title: varReq.Summary,
+                    RequestID: varReq.RequestID,
+                    RequestType: {Value: varReq.RequestType},
+                    RequestStatus: {Value: "Pending"},
+                    IsOpen: true,
+                    SessionID: varReq.SessionID,
+                    StationID: varReq.Station,
+                    StockKey: varReq.StockKey,
+                    ItemID: varReq.ItemID,
+                    LocationCode: varReq.LocationCode,
+                    Quantity: If(IsBlank(varReq.Quantity), Blank(), Value(varReq.Quantity)),
+                    ExpectedVersion: If(IsBlank(varReq.ExpectedVersion), Blank(), Value(varReq.ExpectedVersion)),
+                    PayloadJson: varReq.PayloadJson,
+                    Reason: varReq.Reason,
+                    ReversesLedgerKey: varReq.ReversesLedgerKey,
+                    TargetRequestID: varReq.TargetRequestID,
+                    Decision: If(IsBlank(varReq.Decision), Blank(), {Value: varReq.Decision}),
+                    ClientLocalTime: Text(Now(), "yyyy-mm-dd hh:mm:ss")
+                }), Set(varCreateFailed, true));
+                Set(varSent, Not(varCreateFailed));
+                If(
+                    varCreateFailed,
+                    Set(varFound, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Blank()));
+                    Set(varSent, Not(IsBlank(varFound)))
+                )
+            );
+            If(
+                varSent,
+                Set(varResp, IfError('POU-ProcessRequest'.Run(varReq.RequestID),
+                    {status: "", code: "NO_RESPONSE", message: "", ledgerKey: "", effect: "", newOnHand: "", requestId: varReq.RequestID}));
+                Set(varRow, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Blank()));
+            Set(varFinal, If(IsBlank(varRow), Coalesce(varResp.status, ""), varRow.RequestStatus.Value));
+            Set(varText, If(IsBlank(varRow), Coalesce(varResp.message, ""), Coalesce(varRow.ResultMessage, varResp.message, "")));
+            Set(varEffect, If(IsBlank(varRow), Coalesce(varResp.effect, ""), Coalesce(varRow.InventoryEffect.Value, "")));
+            Set(varShort, Left(varReq.RequestID, 8));
+            If(
+                varFinal = "Succeeded",
+                    Set(varPolling, false); Set(varOutKind, "ok"); Set(varOutText, varText);
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtItemIdAddItem); Reset(txtNameAddItem); Reset(txtMfrAddItem); Reset(txtDescAddItem); Reset(txtLocCodeAddItem); Reset(txtAreaAddItem); Reset(txtMinAddItem); Reset(txtMaxAddItem);
+            SetFocus(txtItemIdAddItem),
+                varFinal = "Rejected",
+                    Set(varPolling, false); Set(varOutKind, "bad"); Set(varOutText, varText);
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtItemIdAddItem); Reset(txtNameAddItem); Reset(txtMfrAddItem); Reset(txtDescAddItem); Reset(txtLocCodeAddItem); Reset(txtAreaAddItem); Reset(txtMinAddItem); Reset(txtMaxAddItem);
+            SetFocus(txtItemIdAddItem),
+                varFinal = "AwaitingSupervisor",
+                    Set(varPolling, false); Set(varOutKind, "wait");
+                    Set(varOutText, "Waiting for a supervisor to approve (request " & varShort & "). Nothing has been changed yet. It appears under History.");
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtItemIdAddItem); Reset(txtNameAddItem); Reset(txtMfrAddItem); Reset(txtDescAddItem); Reset(txtLocCodeAddItem); Reset(txtAreaAddItem); Reset(txtMinAddItem); Reset(txtMaxAddItem);
+            SetFocus(txtItemIdAddItem),
+                varFinal = "Failed",
+                    Set(varPolling, false); Set(varOutKind, "bad");
+                    Set(varOutText, varText & If(varEffect = "NotApplied", "", " The quantity MAY have changed. Do not repeat this. Tell a supervisor (request " & varShort & ")."));
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtItemIdAddItem); Reset(txtNameAddItem); Reset(txtMfrAddItem); Reset(txtDescAddItem); Reset(txtLocCodeAddItem); Reset(txtAreaAddItem); Reset(txtMinAddItem); Reset(txtMaxAddItem);
+            SetFocus(txtItemIdAddItem),
+                Set(varOutKind, "unconfirmed");
+                Set(varOutText, "NOT CONFIRMED (request " & varShort & "). Do not enter it again. Press 'Retry same request' or wait: it cannot post twice and it finishes automatically.");
+                Set(varPolling, true)
+            ),
+                Set(varOutKind, "unconfirmed");
+                Set(varOutText, "NOT CONFIRMED (request " & Left(varReq.RequestID, 8) & "). The app could not confirm that the server received it. Do not enter it again: press 'Retry same request' - the same request number is reused, so it cannot post twice.");
+                Set(varPolling, false)
+            );
+            Set(varBusy, false)
+            )
+    lblAddHelpAddItem As label:
+        X: =24
+        Y: =76
+        Width: =1318
+        Height: =50
+        Text: ="A NEW ITEM adds the item master AND its first stocking location. To stock an EXISTING item (e.g. K102516) in another place, choose ADD LOCATION: the item is never duplicated, merged or renumbered."
+        Size: =14
+        Color: =RGBA(110, 110, 110, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Normal
+        Wrap: =true
+        AutoHeight: =false
+    btnModeNewAddItem As button:
+        X: =24
+        Y: =100
+        Width: =200
+        Height: =44
+        Text: ="NEW ITEM"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            UpdateContext({locMode: "ITEM_CREATE"})
+        Fill: =If(locMode = "ITEM_CREATE", RGBA(31, 56, 100, 1), RGBA(150, 150, 150, 1))
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(If(locMode = "ITEM_CREATE", RGBA(31, 56, 100, 1), RGBA(150, 150, 150, 1)), -15%)
+        PressedFill: =ColorFade(If(locMode = "ITEM_CREATE", RGBA(31, 56, 100, 1), RGBA(150, 150, 150, 1)), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        TabIndex: =1
+    btnModeLocAddItem As button:
+        X: =232
+        Y: =100
+        Width: =200
+        Height: =44
+        Text: ="ADD LOCATION"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            UpdateContext({locMode: "LOCATION_ADD"})
+        Fill: =If(locMode = "ITEM_CREATE", RGBA(150, 150, 150, 1), RGBA(31, 56, 100, 1))
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(If(locMode = "ITEM_CREATE", RGBA(150, 150, 150, 1), RGBA(31, 56, 100, 1)), -15%)
+        PressedFill: =ColorFade(If(locMode = "ITEM_CREATE", RGBA(150, 150, 150, 1), RGBA(31, 56, 100, 1)), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        TabIndex: =2
+    lblL1AddItem As label:
+        X: =24
+        Y: =150
+        Width: =160
+        Height: =40
+        Text: ="Item ID"
+        Size: =16
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    txtItemIdAddItem As text:
+        X: =190
+        Y: =146
+        Width: =380
+        Height: =48
+        HintText: ="Item ID (text; leading zeros kept)"
+        Default: =""
+        Size: =18
+        OnChange: =Set(varLastActivity, Now())
+        DelayOutput: =false
+        DisplayMode: =If(IsBlank(varReq) And Not(varBusy), DisplayMode.Edit, DisplayMode.Disabled)
+        TabIndex: =3
+    lblL2AddItem As label:
+        X: =24
+        Y: =212
+        Width: =160
+        Height: =40
+        Text: ="Name"
+        Size: =16
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+        Visible: =locMode = "ITEM_CREATE"
+    txtNameAddItem As text:
+        X: =190
+        Y: =208
+        Width: =700
+        Height: =48
+        HintText: ="Item name"
+        Default: =""
+        Size: =18
+        OnChange: =Set(varLastActivity, Now())
+        DelayOutput: =false
+        DisplayMode: =If(IsBlank(varReq) And Not(varBusy), DisplayMode.Edit, DisplayMode.Disabled)
+        TabIndex: =4
+        Visible: =locMode = "ITEM_CREATE"
+    lblL3AddItem As label:
+        X: =24
+        Y: =274
+        Width: =160
+        Height: =40
+        Text: ="Manufacturer"
+        Size: =16
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+        Visible: =locMode = "ITEM_CREATE"
+    txtMfrAddItem As text:
+        X: =190
+        Y: =270
+        Width: =380
+        Height: =48
+        HintText: ="Manufacturer (optional)"
+        Default: =""
+        Size: =18
+        OnChange: =Set(varLastActivity, Now())
+        DelayOutput: =false
+        DisplayMode: =If(IsBlank(varReq) And Not(varBusy), DisplayMode.Edit, DisplayMode.Disabled)
+        TabIndex: =5
+        Visible: =locMode = "ITEM_CREATE"
+    lblL4AddItem As label:
+        X: =600
+        Y: =274
+        Width: =130
+        Height: =40
+        Text: ="Description"
+        Size: =16
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+        Visible: =locMode = "ITEM_CREATE"
+    txtDescAddItem As text:
+        X: =730
+        Y: =270
+        Width: =600
+        Height: =48
+        HintText: ="Description (optional)"
+        Default: =""
+        Size: =18
+        OnChange: =Set(varLastActivity, Now())
+        DelayOutput: =false
+        DisplayMode: =If(IsBlank(varReq) And Not(varBusy), DisplayMode.Edit, DisplayMode.Disabled)
+        TabIndex: =6
+        Visible: =locMode = "ITEM_CREATE"
+    lblL5AddItem As label:
+        X: =24
+        Y: =336
+        Width: =160
+        Height: =40
+        Text: ="Location"
+        Size: =16
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    txtLocCodeAddItem As text:
+        X: =190
+        Y: =332
+        Width: =380
+        Height: =48
+        HintText: ="Location code (must exist in the location list)"
+        Default: =""
+        Size: =18
+        OnChange: =Set(varLastActivity, Now())
+        DelayOutput: =false
+        DisplayMode: =If(IsBlank(varReq) And Not(varBusy), DisplayMode.Edit, DisplayMode.Disabled)
+        TabIndex: =7
+    lblLocOkAddItem As label:
+        X: =590
+        Y: =336
+        Width: =600
+        Height: =40
+        Text: =If(IsBlank(txtLocCodeAddItem.Text), "", Not(IsBlank(LookUp(POULocations, LocationCode = Upper(Trim(Substitute(txtLocCodeAddItem.Text, "*", ""))), Active = true))), "Location found", "Unknown or inactive location - an admin adds locations")
+        Size: =14
+        Color: =RGBA(110, 110, 110, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    lblL6AddItem As label:
+        X: =24
+        Y: =398
+        Width: =160
+        Height: =40
+        Text: ="Area"
+        Size: =16
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    txtAreaAddItem As text:
+        X: =190
+        Y: =394
+        Width: =380
+        Height: =48
+        HintText: ="Area (optional)"
+        Default: =""
+        Size: =18
+        OnChange: =Set(varLastActivity, Now())
+        DelayOutput: =false
+        DisplayMode: =If(IsBlank(varReq) And Not(varBusy), DisplayMode.Edit, DisplayMode.Disabled)
+        TabIndex: =8
+    lblL7AddItem As label:
+        X: =24
+        Y: =460
+        Width: =160
+        Height: =40
+        Text: ="Min / Max"
+        Size: =16
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    txtMinAddItem As text:
+        X: =190
+        Y: =456
+        Width: =180
+        Height: =48
+        HintText: ="Min"
+        Default: =""
+        Size: =18
+        OnChange: =Set(varLastActivity, Now())
+        DelayOutput: =false
+        DisplayMode: =If(IsBlank(varReq) And Not(varBusy), DisplayMode.Edit, DisplayMode.Disabled)
+        TabIndex: =9
+    txtMaxAddItem As text:
+        X: =390
+        Y: =456
+        Width: =180
+        Height: =48
+        HintText: ="Max"
+        Default: =""
+        Size: =18
+        OnChange: =Set(varLastActivity, Now())
+        DelayOutput: =false
+        DisplayMode: =If(IsBlank(varReq) And Not(varBusy), DisplayMode.Edit, DisplayMode.Disabled)
+        TabIndex: =10
+    lblAddWhyAddItem As label:
+        X: =590
+        Y: =150
+        Width: =740
+        Height: =40
+        Text: |-
+            =If(
+                IsBlank(txtItemIdAddItem.Text), "",
+                Not(And(Len(Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", "")))) >= 1, Not("|" in Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", "")))), Not(" " in Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", "")))))), "Item ID cannot contain spaces or the | character.",
+                And(locMode = "ITEM_CREATE", Not(IsBlank(LookUp(POUItems, ItemID = Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", ""))))))), "Item " & Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", ""))) & " already exists. Use ADD LOCATION to stock it somewhere else.",
+                And(Not(locMode = "ITEM_CREATE"), Not(Not(IsBlank(LookUp(POUItems, ItemID = Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", "")))))))), "Item " & Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", ""))) & " does not exist. Use NEW ITEM.",
+                ""
+            )
+        Size: =14
+        Color: =RGBA(156, 0, 6, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    lblAddNoteAddItem As label:
+        X: =24
+        Y: =522
+        Width: =1300
+        Height: =40
+        Text: =If(varSupNewItem, "A supervisor must approve this before anything is created. Nothing is created until then, and no quantity is set: the first quantity comes from a supervisor-approved count.", "No quantity is set: the first quantity comes from a count.")
+        Size: =14
+        Color: =RGBA(110, 110, 110, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Normal
+        Wrap: =true
+        AutoHeight: =false
+    btnAddSubmitAddItem As button:
+        X: =24
+        Y: =600
+        Width: =420
+        Height: =60
+        Text: =If(locMode = "ITEM_CREATE", "REQUEST NEW ITEM", "REQUEST NEW LOCATION")
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            If(
+                And(Not(varBusy), IsBlank(varReq), And(Len(Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", "")))) >= 1, Not("|" in Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", "")))), Not(" " in Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", ""))))), If(locMode = "ITEM_CREATE", Len(Trim(txtNameAddItem.Text)) > 0 And Not(Not(IsBlank(LookUp(POUItems, ItemID = Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", ""))))))), Not(IsBlank(LookUp(POUItems, ItemID = Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", ""))))))), Not(IsBlank(LookUp(POULocations, LocationCode = Upper(Trim(Substitute(txtLocCodeAddItem.Text, "*", ""))), Active = true))), IsMatch(Trim(txtMinAddItem.Text), "^(0|[1-9][0-9]{0,5})$"), IsMatch(Trim(txtMaxAddItem.Text), "^(0|[1-9][0-9]{0,5})$"), If(And(IsMatch(Trim(txtMinAddItem.Text), "^(0|[1-9][0-9]{0,5})$"), IsMatch(Trim(txtMaxAddItem.Text), "^(0|[1-9][0-9]{0,5})$")), Value(Trim(txtMinAddItem.Text)) <= Value(Trim(txtMaxAddItem.Text)), false)),
+                Set(varReq, {RequestID: Lower(GUID()), SessionID: varSession, Station: varStation, RequestType: locMode, StockKey: "", ItemID: Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", ""))), LocationCode: Upper(Trim(Substitute(txtLocCodeAddItem.Text, "*", ""))), Quantity: "", ExpectedVersion: "", Reason: "", PayloadJson: JSON({ItemID: Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", ""))), ItemName: Trim(txtNameAddItem.Text), Description: Trim(txtDescAddItem.Text), Manufacturer: Trim(txtMfrAddItem.Text), LocationCode: Upper(Trim(Substitute(txtLocCodeAddItem.Text, "*", ""))), Area: Trim(txtAreaAddItem.Text), MinQty: Value(Trim(txtMinAddItem.Text)), MaxQty: Value(Trim(txtMaxAddItem.Text))}, JSONFormat.Compact), TargetRequestID: "", Decision: "", ReversesLedgerKey: "", Summary: If(locMode = "ITEM_CREATE", "NEW ITEM ", "NEW LOCATION ") & Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", ""))) & " @ " & Upper(Trim(Substitute(txtLocCodeAddItem.Text, "*", ""))) & " by " & varEmpName & " at " & varStation});
+            Collect(colOutbox, varReq);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+                Select(btnRunAddItem)
+            )
+        Fill: =RGBA(84, 130, 53, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(84, 130, 53, 1), -15%)
+        PressedFill: =ColorFade(RGBA(84, 130, 53, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        DisplayMode: =If(And(Not(varBusy), IsBlank(varReq), And(Len(Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", "")))) >= 1, Not("|" in Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", "")))), Not(" " in Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", ""))))), If(locMode = "ITEM_CREATE", Len(Trim(txtNameAddItem.Text)) > 0 And Not(Not(IsBlank(LookUp(POUItems, ItemID = Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", ""))))))), Not(IsBlank(LookUp(POUItems, ItemID = Upper(Trim(Substitute(txtItemIdAddItem.Text, "*", ""))))))), Not(IsBlank(LookUp(POULocations, LocationCode = Upper(Trim(Substitute(txtLocCodeAddItem.Text, "*", ""))), Active = true))), IsMatch(Trim(txtMinAddItem.Text), "^(0|[1-9][0-9]{0,5})$"), IsMatch(Trim(txtMaxAddItem.Text), "^(0|[1-9][0-9]{0,5})$"), If(And(IsMatch(Trim(txtMinAddItem.Text), "^(0|[1-9][0-9]{0,5})$"), IsMatch(Trim(txtMaxAddItem.Text), "^(0|[1-9][0-9]{0,5})$")), Value(Trim(txtMinAddItem.Text)) <= Value(Trim(txtMaxAddItem.Text)), false)), DisplayMode.Edit, DisplayMode.Disabled)
+        Visible: =IsBlank(varReq)
+        TabIndex: =11
+    btnRetryAddItem As button:
+        X: =24
+        Y: =600
+        Width: =420
+        Height: =60
+        Text: ="Retry same request (" & Left(varReq.RequestID, 8) & ")"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Select(btnRunAddItem)
+        Fill: =RGBA(191, 144, 0, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(191, 144, 0, 1), -15%)
+        PressedFill: =ColorFade(RGBA(191, 144, 0, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        DisplayMode: =If(varBusy, DisplayMode.Disabled, DisplayMode.Edit)
+        Visible: =Not(IsBlank(varReq))
+        TabIndex: =11
+    tmrPollAddItem As timer:
+        X: =0
+        Y: =0
+        Width: =6
+        Height: =6
+        Duration: =varPollSec * 1000
+        Repeat: =true
+        AutoStart: =false
+        Start: =varPolling And Not(IsBlank(varReq))
+        OnTimerEnd: |-
+            =If(
+                IsBlank(varReq) Or Not(varPolling),
+                Set(varPolling, false),
+                Set(varPollTries, varPollTries + 1);
+                Set(varResp, {status: "", code: "POLL", message: "", ledgerKey: "", effect: "", newOnHand: "", requestId: varReq.RequestID});
+                Set(varRow, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Blank()));
+            Set(varFinal, If(IsBlank(varRow), Coalesce(varResp.status, ""), varRow.RequestStatus.Value));
+            Set(varText, If(IsBlank(varRow), Coalesce(varResp.message, ""), Coalesce(varRow.ResultMessage, varResp.message, "")));
+            Set(varEffect, If(IsBlank(varRow), Coalesce(varResp.effect, ""), Coalesce(varRow.InventoryEffect.Value, "")));
+            Set(varShort, Left(varReq.RequestID, 8));
+            If(
+                varFinal = "Succeeded",
+                    Set(varPolling, false); Set(varOutKind, "ok"); Set(varOutText, varText);
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtItemIdAddItem); Reset(txtNameAddItem); Reset(txtMfrAddItem); Reset(txtDescAddItem); Reset(txtLocCodeAddItem); Reset(txtAreaAddItem); Reset(txtMinAddItem); Reset(txtMaxAddItem);
+            SetFocus(txtItemIdAddItem),
+                varFinal = "Rejected",
+                    Set(varPolling, false); Set(varOutKind, "bad"); Set(varOutText, varText);
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtItemIdAddItem); Reset(txtNameAddItem); Reset(txtMfrAddItem); Reset(txtDescAddItem); Reset(txtLocCodeAddItem); Reset(txtAreaAddItem); Reset(txtMinAddItem); Reset(txtMaxAddItem);
+            SetFocus(txtItemIdAddItem),
+                varFinal = "AwaitingSupervisor",
+                    Set(varPolling, false); Set(varOutKind, "wait");
+                    Set(varOutText, "Waiting for a supervisor to approve (request " & varShort & "). Nothing has been changed yet. It appears under History.");
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtItemIdAddItem); Reset(txtNameAddItem); Reset(txtMfrAddItem); Reset(txtDescAddItem); Reset(txtLocCodeAddItem); Reset(txtAreaAddItem); Reset(txtMinAddItem); Reset(txtMaxAddItem);
+            SetFocus(txtItemIdAddItem),
+                varFinal = "Failed",
+                    Set(varPolling, false); Set(varOutKind, "bad");
+                    Set(varOutText, varText & If(varEffect = "NotApplied", "", " The quantity MAY have changed. Do not repeat this. Tell a supervisor (request " & varShort & ")."));
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtItemIdAddItem); Reset(txtNameAddItem); Reset(txtMfrAddItem); Reset(txtDescAddItem); Reset(txtLocCodeAddItem); Reset(txtAreaAddItem); Reset(txtMinAddItem); Reset(txtMaxAddItem);
+            SetFocus(txtItemIdAddItem),
+                Set(varOutKind, "unconfirmed");
+                Set(varOutText, "NOT CONFIRMED (request " & varShort & "). Do not enter it again. Press 'Retry same request' or wait: it cannot post twice and it finishes automatically.");
+                Set(varPolling, true)
+            );
+                If(
+                    varPolling And varPollTries * varPollSec >= varPollMax,
+                    Set(varPolling, false);
+                    Set(varOutText, "STILL NOT CONFIRMED (request " & Left(varReq.RequestID, 8) & "). The background job completes pending requests every few minutes. Do not enter it again; check History, or press 'Retry same request'.")
+                )
+            )
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(0, 0, 0, 0)
+        BorderThickness: =0
+        BorderColor: =RGBA(0, 0, 0, 0)
+        DisplayMode: =DisplayMode.View
+    lblBannerAddItem As label:
+        X: =24
+        Y: =672
+        Width: =1000
+        Height: =84
+        Text: =varOutText
+        Size: =18
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =If(varOutKind = "ok", RGBA(198, 239, 206, 1), varOutKind = "bad", RGBA(255, 199, 206, 1), RGBA(255, 230, 153, 1))
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+        Visible: =Not(IsBlank(varOutText))

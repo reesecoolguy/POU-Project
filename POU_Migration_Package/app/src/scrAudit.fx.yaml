@@ -1,0 +1,792 @@
+scrAudit As screen:
+    Fill: =RGBA(242, 242, 242, 1)
+    OnVisible: |-
+        =If(IsBlank(varSession) And Not(varSupMode), Navigate(scrLogin, ScreenTransition.None));
+        Set(varLastActivity, Now());
+        UpdateContext({locSel: Blank(), locMsg: "", locPending: false, locLocPending: false, locLastKey: Now(), locReview: false, locFresh: Blank(), locVer: 0});
+        If(IsBlank(varReq), Clear(colStock); Reset(txtItemAudit); Reset(txtLocAudit); Reset(txtCountAudit); SetFocus(txtItemAudit))
+    recHdrAudit As rectangle:
+        X: =0
+        Y: =0
+        Width: =1366
+        Height: =64
+        Fill: =RGBA(31, 56, 100, 1)
+    lblHdrStationAudit As label:
+        X: =12
+        Y: =4
+        Width: =260
+        Height: =28
+        Text: ="Station " & varStation
+        Size: =16
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    lblHdrUserAudit As label:
+        X: =12
+        Y: =32
+        Width: =560
+        Height: =28
+        Text: =If(varSupMode, varEmpName & " (supervisor, signed in as " & User().Email & ")", varEmpName & " - badge session")
+        Size: =14
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Normal
+        Wrap: =true
+        AutoHeight: =false
+    lblHdrIdleAudit As label:
+        X: =1040
+        Y: =4
+        Width: =200
+        Height: =24
+        Text: ="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+        Size: =12
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Right
+        FontWeight: =FontWeight.Normal
+        Wrap: =true
+        AutoHeight: =false
+    btnHdrOutAudit As button:
+        X: =1250
+        Y: =12
+        Width: =104
+        Height: =40
+        Text: ="Sign out"
+        OnSelect: |-
+            =If(
+                Not(IsBlank(varSession)),
+                IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
+            );
+            Set(varSession, "");
+            Set(varEmpName, "");
+            Set(varRole, "");
+            Set(varSupMode, false);
+            Clear(colStock);
+            Navigate(scrLogin, ScreenTransition.None)
+        Fill: =RGBA(192, 80, 77, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(192, 80, 77, 1), -15%)
+        PressedFill: =ColorFade(RGBA(192, 80, 77, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+    tmrIdleAudit As timer:
+        X: =0
+        Y: =0
+        Width: =6
+        Height: =6
+        Duration: =1000
+        Repeat: =true
+        AutoStart: =false
+        Start: =true
+        OnTimerEnd: |-
+            =Set(varTick, Now());
+            If(
+                (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+                If(
+                    Not(IsBlank(varSession)),
+                    IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
+                );
+                Set(varSession, "");
+                Set(varEmpName, "");
+                Set(varRole, "");
+                Set(varSupMode, false);
+                Clear(colStock);
+                Navigate(scrLogin, ScreenTransition.None)
+            )
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(0, 0, 0, 0)
+        BorderThickness: =0
+        BorderColor: =RGBA(0, 0, 0, 0)
+        DisplayMode: =DisplayMode.View
+    btnNavScanAudit As button:
+        X: =580
+        Y: =18
+        Width: =110
+        Height: =36
+        Text: ="Add / Remove"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrScan, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =Not(varSupMode)
+    btnNavAuditAudit As button:
+        X: =695
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="Count"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrAudit, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavAddItemAudit As button:
+        X: =800
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="New item"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrAddItem, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavLowAudit As button:
+        X: =905
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="Low stock"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrLowStock, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavHistAudit As button:
+        X: =1010
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="History"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrHistory, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavSupAudit As button:
+        X: =1115
+        Y: =18
+        Width: =110
+        Height: =36
+        Text: ="Supervisor"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrSupervisor, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =varSupMode
+    btnNavAdminAudit As button:
+        X: =1230
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="Admin"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrAdmin, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =varSupMode
+    btnRunAudit As button:
+        X: =8
+        Y: =8
+        Width: =6
+        Height: =6
+        Text: =""
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(0, 0, 0, 0)
+        BorderThickness: =0
+        OnSelect: |-
+            =If(
+                IsBlank(varReq) Or varBusy,
+                false,
+                Set(varBusy, true);
+            Set(varOutKind, "");
+            Set(varOutText, "");
+            Set(varLookupFailed, false);
+            Set(varFound, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Set(varLookupFailed, true); Blank()));
+            Set(varSent, Not(IsBlank(varFound)));
+            If(
+                Not(varSent) And Not(varLookupFailed),
+                Set(varCreateFailed, false);
+                IfError(Patch(POURequests, Defaults(POURequests), {
+                    Title: varReq.Summary,
+                    RequestID: varReq.RequestID,
+                    RequestType: {Value: varReq.RequestType},
+                    RequestStatus: {Value: "Pending"},
+                    IsOpen: true,
+                    SessionID: varReq.SessionID,
+                    StationID: varReq.Station,
+                    StockKey: varReq.StockKey,
+                    ItemID: varReq.ItemID,
+                    LocationCode: varReq.LocationCode,
+                    Quantity: If(IsBlank(varReq.Quantity), Blank(), Value(varReq.Quantity)),
+                    ExpectedVersion: If(IsBlank(varReq.ExpectedVersion), Blank(), Value(varReq.ExpectedVersion)),
+                    PayloadJson: varReq.PayloadJson,
+                    Reason: varReq.Reason,
+                    ReversesLedgerKey: varReq.ReversesLedgerKey,
+                    TargetRequestID: varReq.TargetRequestID,
+                    Decision: If(IsBlank(varReq.Decision), Blank(), {Value: varReq.Decision}),
+                    ClientLocalTime: Text(Now(), "yyyy-mm-dd hh:mm:ss")
+                }), Set(varCreateFailed, true));
+                Set(varSent, Not(varCreateFailed));
+                If(
+                    varCreateFailed,
+                    Set(varFound, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Blank()));
+                    Set(varSent, Not(IsBlank(varFound)))
+                )
+            );
+            If(
+                varSent,
+                Set(varResp, IfError('POU-ProcessRequest'.Run(varReq.RequestID),
+                    {status: "", code: "NO_RESPONSE", message: "", ledgerKey: "", effect: "", newOnHand: "", requestId: varReq.RequestID}));
+                Set(varRow, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Blank()));
+            Set(varFinal, If(IsBlank(varRow), Coalesce(varResp.status, ""), varRow.RequestStatus.Value));
+            Set(varText, If(IsBlank(varRow), Coalesce(varResp.message, ""), Coalesce(varRow.ResultMessage, varResp.message, "")));
+            Set(varEffect, If(IsBlank(varRow), Coalesce(varResp.effect, ""), Coalesce(varRow.InventoryEffect.Value, "")));
+            Set(varShort, Left(varReq.RequestID, 8));
+            If(
+                varFinal = "Succeeded",
+                    Set(varPolling, false); Set(varOutKind, "ok"); Set(varOutText, varText);
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtCountAudit);
+            UpdateContext({locReview: false, locSel: Blank(), locFresh: Blank()});
+            Reset(txtItemAudit); Reset(txtLocAudit); Clear(colStock); SetFocus(txtItemAudit),
+                varFinal = "Rejected",
+                    Set(varPolling, false); Set(varOutKind, "bad"); Set(varOutText, varText);
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtCountAudit);
+            UpdateContext({locReview: false, locSel: Blank(), locFresh: Blank()});
+            Reset(txtItemAudit); Reset(txtLocAudit); Clear(colStock); SetFocus(txtItemAudit),
+                varFinal = "AwaitingSupervisor",
+                    Set(varPolling, false); Set(varOutKind, "wait");
+                    Set(varOutText, "Waiting for a supervisor to approve (request " & varShort & "). Nothing has been changed yet. It appears under History.");
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtCountAudit);
+            UpdateContext({locReview: false, locSel: Blank(), locFresh: Blank()});
+            Reset(txtItemAudit); Reset(txtLocAudit); Clear(colStock); SetFocus(txtItemAudit),
+                varFinal = "Failed",
+                    Set(varPolling, false); Set(varOutKind, "bad");
+                    Set(varOutText, varText & If(varEffect = "NotApplied", "", " The quantity MAY have changed. Do not repeat this. Tell a supervisor (request " & varShort & ")."));
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtCountAudit);
+            UpdateContext({locReview: false, locSel: Blank(), locFresh: Blank()});
+            Reset(txtItemAudit); Reset(txtLocAudit); Clear(colStock); SetFocus(txtItemAudit),
+                Set(varOutKind, "unconfirmed");
+                Set(varOutText, "NOT CONFIRMED (request " & varShort & "). Do not enter it again. Press 'Retry same request' or wait: it cannot post twice and it finishes automatically.");
+                Set(varPolling, true)
+            ),
+                Set(varOutKind, "unconfirmed");
+                Set(varOutText, "NOT CONFIRMED (request " & Left(varReq.RequestID, 8) & "). The app could not confirm that the server received it. Do not enter it again: press 'Retry same request' - the same request number is reused, so it cannot post twice.");
+                Set(varPolling, false)
+            );
+            Set(varBusy, false)
+            )
+    lblStep1Audit As label:
+        X: =24
+        Y: =80
+        Width: =400
+        Height: =24
+        Text: ="1  Scan the item"
+        Size: =14
+        Color: =RGBA(110, 110, 110, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    txtItemAudit As text:
+        X: =24
+        Y: =106
+        Width: =420
+        Height: =48
+        HintText: ="Scan or type item number"
+        Default: =""
+        Size: =18
+        OnChange: |-
+            =UpdateContext({locPending: true, locLastKey: Now()});
+            Set(varLastActivity, Now())
+        DelayOutput: =false
+        DisplayMode: =If(IsBlank(varReq), DisplayMode.Edit, DisplayMode.View)
+        TabIndex: =1
+    btnFindAudit As button:
+        X: =452
+        Y: =106
+        Width: =100
+        Height: =48
+        Text: ="Look up"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            UpdateContext({locPending: false, locSel: Blank(), locMsg: ""});
+            Reset(txtCountAudit); Reset(txtLocAudit);
+            With(
+                {scan: Upper(Trim(Substitute(txtItemAudit.Text, "*", "")))},
+                If(
+                    Len(scan) < varScanMin,
+                    UpdateContext({locMsg: "Scan or type the item number."}),
+                    Set(varLookupFailed, false);
+                    IfError(
+                        ClearCollect(colStock, SortByColumns(Filter(POUStockLocations, ItemID = scan, Active = true), "LocationCode", SortOrder.Ascending)),
+                        Set(varLookupFailed, true); Clear(colStock);
+                        UpdateContext({locMsg: "Could not look the item up (network?). Nothing was changed. Scan it again."})
+                    );
+                    If(
+                        Not(varLookupFailed),
+                        If(
+                            CountRows(colStock) = 0,
+                            UpdateContext({locMsg: If(
+                                Not(IsBlank(LookUp(POUItems, ItemID = scan))),
+                                "Item " & scan & " exists but is not stocked in any active location. A supervisor can add a stocking location (New item screen).",
+                                "Item " & scan & " was not found. Check the barcode, or ask a supervisor to add the item.")}),
+                            CountRows(colStock) = 1,
+                            UpdateContext({locSel: First(colStock), locVer: First(colStock).StockVersion, locReview: false, locFresh: Blank()}); SetFocus(txtCountAudit),
+                            UpdateContext({locMsg: "Item " & scan & " is stocked in " & CountRows(colStock) & " locations. Choose or scan the location."});
+                            SetFocus(txtLocAudit)
+                        )
+                    )
+                )
+            )
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        DisplayMode: =If(IsBlank(varReq), DisplayMode.Edit, DisplayMode.View)
+        TabIndex: =2
+    lblStep2Audit As label:
+        X: =580
+        Y: =80
+        Width: =520
+        Height: =24
+        Text: ="2  Location (only when the item is in several places)"
+        Size: =14
+        Color: =RGBA(110, 110, 110, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    txtLocAudit As text:
+        X: =580
+        Y: =106
+        Width: =360
+        Height: =48
+        HintText: ="Scan or type location"
+        Default: =""
+        Size: =18
+        OnChange: |-
+            =UpdateContext({locLocPending: true, locLastKey: Now()});
+            Set(varLastActivity, Now())
+        DelayOutput: =false
+        DisplayMode: =If(IsBlank(varReq), DisplayMode.Edit, DisplayMode.View)
+        TabIndex: =3
+        Visible: =CountRows(colStock) > 1
+    btnLocAudit As button:
+        X: =948
+        Y: =106
+        Width: =130
+        Height: =48
+        Text: ="Use location"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            UpdateContext({locLocPending: false});
+            With(
+                {loc: Upper(Trim(Substitute(txtLocAudit.Text, "*", "")))},
+                If(
+                    CountRows(colStock) = 0,
+                    UpdateContext({locMsg: "Scan the item first."}),
+                    IsBlank(LookUp(colStock, LocationCode = loc)),
+                    UpdateContext({locSel: Blank(), locMsg: "Item " & First(colStock).ItemID & " is not stocked at " & loc & ". Choose a listed location, or ask a supervisor to add that location."}),
+                    UpdateContext({locSel: LookUp(colStock, LocationCode = loc), locVer: LookUp(colStock, LocationCode = loc).StockVersion, locReview: false, locFresh: Blank()}); UpdateContext({locMsg: ""}); SetFocus(txtCountAudit)
+                )
+            )
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        DisplayMode: =If(IsBlank(varReq), DisplayMode.Edit, DisplayMode.View)
+        Visible: =CountRows(colStock) > 1
+        TabIndex: =4
+    tmrScanAudit As timer:
+        X: =0
+        Y: =0
+        Width: =6
+        Height: =6
+        Duration: =150
+        Repeat: =true
+        AutoStart: =false
+        Start: =true
+        OnTimerEnd: |-
+            =If(
+                locPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+                Select(btnFindAudit)
+            );
+            If(
+                locLocPending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+                Select(btnLocAudit)
+            )
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(0, 0, 0, 0)
+        BorderThickness: =0
+        BorderColor: =RGBA(0, 0, 0, 0)
+        DisplayMode: =DisplayMode.View
+    lblMsgAudit As label:
+        X: =24
+        Y: =160
+        Width: =1100
+        Height: =30
+        Text: =locMsg
+        Size: =14
+        Color: =RGBA(156, 0, 6, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+        Visible: =Not(IsBlank(locMsg))
+    galLocAudit As gallery.galleryVertical:
+        X: =24
+        Y: =196
+        Width: =420
+        Height: =230
+        Items: =colStock
+        TemplateSize: =56
+        Visible: =CountRows(colStock) > 1
+        TemplateFill: =If(ThisItem.StockKey = locSel.StockKey, RGBA(221, 235, 247, 1), RGBA(255, 255, 255, 1))
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            UpdateContext({locSel: ThisItem, locVer: ThisItem.StockVersion, locReview: false, locFresh: Blank()});
+            UpdateContext({locMsg: ""});
+            SetFocus(txtCountAudit)
+        lblGalLocAudit As label:
+            X: =8
+            Y: =8
+            Width: =400
+            Height: =40
+            Text: =ThisItem.LocationCode & "   on hand: " & If(IsBlank(ThisItem.OnHandQty), "-", Text(ThisItem.OnHandQty))
+            Size: =18
+            Color: =RGBA(32, 32, 32, 1)
+            Fill: =RGBA(0, 0, 0, 0)
+            Align: =Align.Left
+            FontWeight: =FontWeight.Bold
+            Wrap: =true
+            AutoHeight: =false
+    lblAudNameAudit As label:
+        X: =24
+        Y: =400
+        Width: =1300
+        Height: =36
+        Text: =If(IsBlank(locSel), "", locSel.ItemName & "   |   " & locSel.ItemID & " @ " & locSel.LocationCode & "   (count started at record version " & locVer & ")")
+        Size: =20
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    lblStep3Audit As label:
+        X: =24
+        Y: =440
+        Width: =600
+        Height: =24
+        Text: ="3  Counted quantity (physical count, 0 or more)"
+        Size: =14
+        Color: =RGBA(110, 110, 110, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    txtCountAudit As text:
+        X: =24
+        Y: =466
+        Width: =240
+        Height: =60
+        HintText: ="Counted quantity"
+        Default: =""
+        Size: =30
+        OnChange: |-
+            =Set(varLastActivity, Now());
+            UpdateContext({locReview: false, locFresh: Blank()})
+        DelayOutput: =false
+        DisplayMode: =If(And(IsBlank(varReq), Not(IsBlank(locSel))), DisplayMode.Edit, DisplayMode.Disabled)
+        TabIndex: =5
+    lblCountHintAudit As label:
+        X: =280
+        Y: =466
+        Width: =820
+        Height: =60
+        Text: =If(IsBlank(txtCountAudit.Text), "", Not(IsMatch(Trim(txtCountAudit.Text), "^(0|[1-9][0-9]{0,5})$")), "Counted quantity must be a whole number, 0 or more. Was a barcode scanned into this box?", "")
+        Size: =14
+        Color: =RGBA(156, 0, 6, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    btnReviewAudit As button:
+        X: =24
+        Y: =540
+        Width: =240
+        Height: =60
+        Text: ="Review count"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            IfError(
+                UpdateContext({locFresh: LookUp(POUStockLocations, StockKey = locSel.StockKey), locReview: true, locMsg: ""}),
+                UpdateContext({locMsg: "Could not re-read the current quantity (network?). Nothing was changed. Press Review again."})
+            )
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        DisplayMode: =If(And(IsBlank(varReq), Not(IsBlank(locSel)), IsMatch(Trim(txtCountAudit.Text), "^(0|[1-9][0-9]{0,5})$")), DisplayMode.Edit, DisplayMode.Disabled)
+        Visible: =IsBlank(varReq)
+        TabIndex: =6
+    lblReviewAudit As label:
+        X: =290
+        Y: =540
+        Width: =800
+        Height: =92
+        Text: |-
+            =If(
+                Not(locReview) Or IsBlank(locFresh), "",
+                And(locReview, Not(IsBlank(locFresh)), locFresh.StockVersion <> locVer), "STOCK MOVED while you were counting: the record changed from version " & locVer & " to " & locFresh.StockVersion & " (an ADD, REMOVE or other posting happened). RECOUNT.",
+                IsBlank(locFresh.OnHandQty), "FIRST COUNT. Counted " & Trim(txtCountAudit.Text) & ". There is no previous balance; this count becomes the verified starting quantity.",
+                "Counted " & Trim(txtCountAudit.Text) & "   |   System says " & locFresh.OnHandQty & "   |   Variance " & Text((Value(Trim(txtCountAudit.Text)) - locFresh.OnHandQty), "+0;-0;0")
+            )
+        Size: =18
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =If(And(locReview, Not(IsBlank(locFresh)), locFresh.StockVersion <> locVer), RGBA(255, 199, 206, 1), And(locReview, Not(IsBlank(locFresh.OnHandQty)), Abs((Value(Trim(txtCountAudit.Text)) - locFresh.OnHandQty)) >= varAuditVar), RGBA(255, 230, 153, 1), RGBA(221, 235, 247, 1))
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+        Visible: =locReview
+    btnRecountAudit As button:
+        X: =1110
+        Y: =540
+        Width: =200
+        Height: =60
+        Text: ="Recount"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Reset(txtCountAudit);
+            UpdateContext({locReview: false, locFresh: Blank(), locVer: LookUp(POUStockLocations, StockKey = locSel.StockKey).StockVersion, locSel: LookUp(POUStockLocations, StockKey = locSel.StockKey)});
+            SetFocus(txtCountAudit)
+        Fill: =RGBA(191, 144, 0, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(191, 144, 0, 1), -15%)
+        PressedFill: =ColorFade(RGBA(191, 144, 0, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =locReview And IsBlank(varReq)
+        TabIndex: =8
+    btnPostCountAudit As button:
+        X: =24
+        Y: =650
+        Width: =520
+        Height: =60
+        Text: =If(And(locReview, Not(IsBlank(locFresh.OnHandQty)), Abs((Value(Trim(txtCountAudit.Text)) - locFresh.OnHandQty)) >= varAuditVar), "Variance is " & Text((Value(Trim(txtCountAudit.Text)) - locFresh.OnHandQty), "+0;-0;0") & " - I recounted. POST COUNT", "POST COUNT")
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            If(
+                And(Not(varBusy), IsBlank(varReq), locReview, Not(IsBlank(locSel)), IsMatch(Trim(txtCountAudit.Text), "^(0|[1-9][0-9]{0,5})$"), Not(And(locReview, Not(IsBlank(locFresh)), locFresh.StockVersion <> locVer))),
+                Set(varReq, {RequestID: Lower(GUID()), SessionID: varSession, Station: varStation, RequestType: "AUDIT", StockKey: locSel.StockKey, ItemID: locSel.ItemID, LocationCode: locSel.LocationCode, Quantity: Trim(txtCountAudit.Text), ExpectedVersion: Text(locVer), Reason: "", PayloadJson: "", TargetRequestID: "", Decision: "", ReversesLedgerKey: "", Summary: "COUNT " & Trim(txtCountAudit.Text) & " x " & locSel.ItemID & " @ " & locSel.LocationCode & " by " & varEmpName & " at " & varStation});
+            Collect(colOutbox, varReq);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+                Select(btnRunAudit)
+            )
+        Fill: =If(And(locReview, Not(IsBlank(locFresh.OnHandQty)), Abs((Value(Trim(txtCountAudit.Text)) - locFresh.OnHandQty)) >= varAuditVar), RGBA(192, 80, 77, 1), RGBA(84, 130, 53, 1))
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =18
+        HoverFill: =ColorFade(If(And(locReview, Not(IsBlank(locFresh.OnHandQty)), Abs((Value(Trim(txtCountAudit.Text)) - locFresh.OnHandQty)) >= varAuditVar), RGBA(192, 80, 77, 1), RGBA(84, 130, 53, 1)), -15%)
+        PressedFill: =ColorFade(If(And(locReview, Not(IsBlank(locFresh.OnHandQty)), Abs((Value(Trim(txtCountAudit.Text)) - locFresh.OnHandQty)) >= varAuditVar), RGBA(192, 80, 77, 1), RGBA(84, 130, 53, 1)), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        DisplayMode: =If(And(locReview, Not(And(locReview, Not(IsBlank(locFresh)), locFresh.StockVersion <> locVer)), Not(varBusy)), DisplayMode.Edit, DisplayMode.Disabled)
+        Visible: =IsBlank(varReq)
+        TabIndex: =7
+    btnRetryAudit As button:
+        X: =24
+        Y: =650
+        Width: =520
+        Height: =60
+        Text: ="Retry same request (" & Left(varReq.RequestID, 8) & ")"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Select(btnRunAudit)
+        Fill: =RGBA(191, 144, 0, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(191, 144, 0, 1), -15%)
+        PressedFill: =ColorFade(RGBA(191, 144, 0, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        DisplayMode: =If(varBusy, DisplayMode.Disabled, DisplayMode.Edit)
+        Visible: =Not(IsBlank(varReq))
+        TabIndex: =7
+    tmrPollAudit As timer:
+        X: =0
+        Y: =0
+        Width: =6
+        Height: =6
+        Duration: =varPollSec * 1000
+        Repeat: =true
+        AutoStart: =false
+        Start: =varPolling And Not(IsBlank(varReq))
+        OnTimerEnd: |-
+            =If(
+                IsBlank(varReq) Or Not(varPolling),
+                Set(varPolling, false),
+                Set(varPollTries, varPollTries + 1);
+                Set(varResp, {status: "", code: "POLL", message: "", ledgerKey: "", effect: "", newOnHand: "", requestId: varReq.RequestID});
+                Set(varRow, IfError(LookUp(POURequests, RequestID = varReq.RequestID), Blank()));
+            Set(varFinal, If(IsBlank(varRow), Coalesce(varResp.status, ""), varRow.RequestStatus.Value));
+            Set(varText, If(IsBlank(varRow), Coalesce(varResp.message, ""), Coalesce(varRow.ResultMessage, varResp.message, "")));
+            Set(varEffect, If(IsBlank(varRow), Coalesce(varResp.effect, ""), Coalesce(varRow.InventoryEffect.Value, "")));
+            Set(varShort, Left(varReq.RequestID, 8));
+            If(
+                varFinal = "Succeeded",
+                    Set(varPolling, false); Set(varOutKind, "ok"); Set(varOutText, varText);
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtCountAudit);
+            UpdateContext({locReview: false, locSel: Blank(), locFresh: Blank()});
+            Reset(txtItemAudit); Reset(txtLocAudit); Clear(colStock); SetFocus(txtItemAudit),
+                varFinal = "Rejected",
+                    Set(varPolling, false); Set(varOutKind, "bad"); Set(varOutText, varText);
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtCountAudit);
+            UpdateContext({locReview: false, locSel: Blank(), locFresh: Blank()});
+            Reset(txtItemAudit); Reset(txtLocAudit); Clear(colStock); SetFocus(txtItemAudit),
+                varFinal = "AwaitingSupervisor",
+                    Set(varPolling, false); Set(varOutKind, "wait");
+                    Set(varOutText, "Waiting for a supervisor to approve (request " & varShort & "). Nothing has been changed yet. It appears under History.");
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtCountAudit);
+            UpdateContext({locReview: false, locSel: Blank(), locFresh: Blank()});
+            Reset(txtItemAudit); Reset(txtLocAudit); Clear(colStock); SetFocus(txtItemAudit),
+                varFinal = "Failed",
+                    Set(varPolling, false); Set(varOutKind, "bad");
+                    Set(varOutText, varText & If(varEffect = "NotApplied", "", " The quantity MAY have changed. Do not repeat this. Tell a supervisor (request " & varShort & ")."));
+                    RemoveIf(colOutbox, RequestID = varReq.RequestID);
+            IfError(SaveData(colOutbox, "POUOutbox"), true);
+            Set(varReq, Blank());
+            Reset(txtCountAudit);
+            UpdateContext({locReview: false, locSel: Blank(), locFresh: Blank()});
+            Reset(txtItemAudit); Reset(txtLocAudit); Clear(colStock); SetFocus(txtItemAudit),
+                Set(varOutKind, "unconfirmed");
+                Set(varOutText, "NOT CONFIRMED (request " & varShort & "). Do not enter it again. Press 'Retry same request' or wait: it cannot post twice and it finishes automatically.");
+                Set(varPolling, true)
+            );
+                If(
+                    varPolling And varPollTries * varPollSec >= varPollMax,
+                    Set(varPolling, false);
+                    Set(varOutText, "STILL NOT CONFIRMED (request " & Left(varReq.RequestID, 8) & "). The background job completes pending requests every few minutes. Do not enter it again; check History, or press 'Retry same request'.")
+                )
+            )
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(0, 0, 0, 0)
+        BorderThickness: =0
+        BorderColor: =RGBA(0, 0, 0, 0)
+        DisplayMode: =DisplayMode.View
+    lblBannerAudit As label:
+        X: =24
+        Y: =712
+        Width: =1000
+        Height: =52
+        Text: =varOutText
+        Size: =18
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =If(varOutKind = "ok", RGBA(198, 239, 206, 1), varOutKind = "bad", RGBA(255, 199, 206, 1), RGBA(255, 230, 153, 1))
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+        Visible: =Not(IsBlank(varOutText))

@@ -1,0 +1,42 @@
+App As appinfo:
+    StartScreen: =scrLogin
+    OnStart: |-
+        =// 1. who/where: the Microsoft account running the app is NOT the employee
+        Set(varStation, Upper(Trim(Coalesce(Param("StationID"), LookUp(POUStations, Active = true, ExpectedAccountUPN = Lower(User().Email)).StationID, ""))));
+        Set(varBuild, "POU-APP-d414ca54");
+        Set(varRowLimit, 500);
+        // 2. central settings (editable in POUSettings); defaults mirror schema/settings_defaults.json
+        Set(varSettingsOk, false);
+        IfError(ClearCollect(colSettings, POUSettings); Set(varSettingsOk, CountRows(colSettings) > 0), Clear(colSettings));
+        Set(varIdleMin, If(IsNumeric(LookUp(colSettings, SettingKey = "IdleTimeoutMinutes").SettingValue), Value(LookUp(colSettings, SettingKey = "IdleTimeoutMinutes").SettingValue), 3));
+        Set(varMaxAdd, If(IsNumeric(LookUp(colSettings, SettingKey = "MaxAddQty").SettingValue), Value(LookUp(colSettings, SettingKey = "MaxAddQty").SettingValue), 500));
+        Set(varAuditVar, If(IsNumeric(LookUp(colSettings, SettingKey = "AuditConfirmVariance").SettingValue), Value(LookUp(colSettings, SettingKey = "AuditConfirmVariance").SettingValue), 5));
+        Set(varScanIdle, If(IsNumeric(LookUp(colSettings, SettingKey = "ScanCommitIdleMs").SettingValue), Value(LookUp(colSettings, SettingKey = "ScanCommitIdleMs").SettingValue), 350));
+        Set(varScanMin, If(IsNumeric(LookUp(colSettings, SettingKey = "ScanMinLength").SettingValue), Value(LookUp(colSettings, SettingKey = "ScanMinLength").SettingValue), 3));
+        Set(varPollSec, If(IsNumeric(LookUp(colSettings, SettingKey = "StatusPollSeconds").SettingValue), Value(LookUp(colSettings, SettingKey = "StatusPollSeconds").SettingValue), 2));
+        Set(varPollMax, If(IsNumeric(LookUp(colSettings, SettingKey = "StatusPollTimeoutSeconds").SettingValue), Value(LookUp(colSettings, SettingKey = "StatusPollTimeoutSeconds").SettingValue), 45));
+        Set(varLogoutAfter, Lower(Coalesce(LookUp(colSettings, SettingKey = "LogoutAfterSubmit").SettingValue, "false")) = "true");
+        Set(varSupAudit, Lower(Coalesce(LookUp(colSettings, SettingKey = "RequireSupervisorForAudit").SettingValue, "true")) = "true");
+        Set(varSupNewItem, Lower(Coalesce(LookUp(colSettings, SettingKey = "RequireSupervisorForNewItem").SettingValue, "true")) = "true");
+        Set(varLowRule, Coalesce(LookUp(colSettings, SettingKey = "LowStockRule").SettingValue, "LE"));
+        Set(varTzName, Coalesce(LookUp(colSettings, SettingKey = "DisplayTimeZoneIana").SettingValue, "America/Chicago"));
+        // 3. is this Microsoft account a supervisor/admin? Display only - the server decides authority from the request Author.
+        Set(varMeEmp, IfError(LookUp(POUEmployees, MicrosoftUPN = Lower(User().Email), Active = true), Blank()));
+        Set(varIsPriv, Not(IsBlank(varMeEmp)) And varMeEmp.Role.Value <> "Operator");
+        // 4. state
+        Set(varSession, ""); Set(varEmpName, ""); Set(varRole, ""); Set(varSupMode, false);
+        Set(varBusy, false); Set(varLastActivity, Now()); Set(varTick, Now());
+        Set(varLoginMsg, ""); Set(varOutKind, ""); Set(varOutText, ""); Set(varPolling, false); Set(varPollTries, 0);
+        Set(varLookupFailed, false); Set(varCreateFailed, false); Set(varSent, false);
+        Set(varLogin, {ok: "no", code: "", message: "", sessionId: "", employeeName: "", role: "", idleMinutes: ""});
+        Set(varResp, {status: "", code: "", message: "", ledgerKey: "", effect: "", newOnHand: "", requestId: ""});
+        Set(varFound, Blank()); Set(varRow, Blank()); Set(varTgtRow, Blank());
+        Set(varFinal, ""); Set(varText, ""); Set(varEffect, ""); Set(varShort, "");
+        // 5. the local outbox: a request that was filed but never confirmed survives a crash/restart and keeps its RequestID
+        ClearCollect(colOutbox, {RequestID: "", SessionID: "", Station: "", RequestType: "", StockKey: "", ItemID: "", LocationCode: "", Quantity: "", ExpectedVersion: "", Reason: "", PayloadJson: "", TargetRequestID: "", Decision: "", ReversesLedgerKey: "", Summary: ""});
+        Clear(colOutbox);
+        IfError(LoadData(colOutbox, "POUOutbox", true), true);
+        Set(varReq, Blank());
+        ClearCollect(colStock, {ID: 0, StockKey: "", ItemID: "", LocationCode: "", ItemName: "", Area: "", MinQty: 0, MaxQty: 0, OnHandQty: 0, StockVersion: 0, LowStockFlag: false, Active: true});
+        Clear(colStock)
+    OnError: =Notify("Something went wrong: " & FirstError.Message & ". If you were submitting a request, do NOT enter it again - use 'Retry same request'.", NotificationType.Error)

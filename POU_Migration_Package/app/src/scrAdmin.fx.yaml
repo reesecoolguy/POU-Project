@@ -1,0 +1,450 @@
+scrAdmin As screen:
+    Fill: =RGBA(242, 242, 242, 1)
+    OnVisible: |-
+        =If(Not(varSupMode), Navigate(scrLogin, ScreenTransition.None));
+        Set(varLastActivity, Now());
+        Refresh(POUSettings)
+    recHdrAdmin As rectangle:
+        X: =0
+        Y: =0
+        Width: =1366
+        Height: =64
+        Fill: =RGBA(31, 56, 100, 1)
+    lblHdrStationAdmin As label:
+        X: =12
+        Y: =4
+        Width: =260
+        Height: =28
+        Text: ="Station " & varStation
+        Size: =16
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    lblHdrUserAdmin As label:
+        X: =12
+        Y: =32
+        Width: =560
+        Height: =28
+        Text: =If(varSupMode, varEmpName & " (supervisor, signed in as " & User().Email & ")", varEmpName & " - badge session")
+        Size: =14
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Normal
+        Wrap: =true
+        AutoHeight: =false
+    lblHdrIdleAdmin As label:
+        X: =1040
+        Y: =4
+        Width: =200
+        Height: =24
+        Text: ="Auto sign-out in " & Max(0, varIdleMin * 60 - DateDiff(varLastActivity, varTick, Seconds)) & " s"
+        Size: =12
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Right
+        FontWeight: =FontWeight.Normal
+        Wrap: =true
+        AutoHeight: =false
+    btnHdrOutAdmin As button:
+        X: =1250
+        Y: =12
+        Width: =104
+        Height: =40
+        Text: ="Sign out"
+        OnSelect: |-
+            =If(
+                Not(IsBlank(varSession)),
+                IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
+            );
+            Set(varSession, "");
+            Set(varEmpName, "");
+            Set(varRole, "");
+            Set(varSupMode, false);
+            Clear(colStock);
+            Navigate(scrLogin, ScreenTransition.None)
+        Fill: =RGBA(192, 80, 77, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(192, 80, 77, 1), -15%)
+        PressedFill: =ColorFade(RGBA(192, 80, 77, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+    tmrIdleAdmin As timer:
+        X: =0
+        Y: =0
+        Width: =6
+        Height: =6
+        Duration: =1000
+        Repeat: =true
+        AutoStart: =false
+        Start: =true
+        OnTimerEnd: |-
+            =Set(varTick, Now());
+            If(
+                (Not(IsBlank(varSession)) Or varSupMode) And DateDiff(varLastActivity, varTick, Seconds) >= varIdleMin * 60,
+                If(
+                    Not(IsBlank(varSession)),
+                    IfError('POU-Session'.Run("LOGOUT", "", varStation, varSession, Lower(User().Email)), true)
+                );
+                Set(varSession, "");
+                Set(varEmpName, "");
+                Set(varRole, "");
+                Set(varSupMode, false);
+                Clear(colStock);
+                Navigate(scrLogin, ScreenTransition.None)
+            )
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(0, 0, 0, 0)
+        BorderThickness: =0
+        BorderColor: =RGBA(0, 0, 0, 0)
+        DisplayMode: =DisplayMode.View
+    btnNavScanAdmin As button:
+        X: =580
+        Y: =18
+        Width: =110
+        Height: =36
+        Text: ="Add / Remove"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrScan, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =Not(varSupMode)
+    btnNavAuditAdmin As button:
+        X: =695
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="Count"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrAudit, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavAddItemAdmin As button:
+        X: =800
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="New item"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrAddItem, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavLowAdmin As button:
+        X: =905
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="Low stock"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrLowStock, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavHistAdmin As button:
+        X: =1010
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="History"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrHistory, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =true
+    btnNavSupAdmin As button:
+        X: =1115
+        Y: =18
+        Width: =110
+        Height: =36
+        Text: ="Supervisor"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrSupervisor, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =varSupMode
+    btnNavAdminAdmin As button:
+        X: =1230
+        Y: =18
+        Width: =100
+        Height: =36
+        Text: ="Admin"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Navigate(scrAdmin, ScreenTransition.None)
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =12
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        Visible: =varSupMode
+    lblAdmTitleAdmin As label:
+        X: =24
+        Y: =76
+        Width: =1300
+        Height: =30
+        Text: ="Settings (central configuration). Changes are versioned in SharePoint; flows read them on every run."
+        Size: =16
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    lblAdmWhoAdmin As label:
+        X: =24
+        Y: =104
+        Width: =800
+        Height: =28
+        Text: =If(varRole = "Admin", "", "Read only - you are not an Admin. SharePoint would refuse your edits anyway.")
+        Size: =13
+        Color: =RGBA(255, 199, 206, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    txtSetFilterAdmin As text:
+        X: =24
+        Y: =136
+        Width: =300
+        Height: =40
+        HintText: ="Filter by name..."
+        Default: =""
+        Size: =18
+        OnChange: =Set(varLastActivity, Now())
+        DelayOutput: =false
+        TabIndex: =1
+    galSetAdmin As gallery.galleryVertical:
+        X: =24
+        Y: =182
+        Width: =900
+        Height: =540
+        TemplateSize: =52
+        Items: =SortByColumns(Filter(POUSettings, StartsWith(SettingKey, Trim(txtSetFilterAdmin.Text))), "SettingKey", SortOrder.Ascending)
+        lblSetKeyAdmin As label:
+            X: =8
+            Y: =6
+            Width: =330
+            Height: =40
+            Text: =ThisItem.SettingKey
+            Size: =14
+            Color: =RGBA(32, 32, 32, 1)
+            Fill: =RGBA(0, 0, 0, 0)
+            Align: =Align.Left
+            FontWeight: =FontWeight.Bold
+            Wrap: =true
+            AutoHeight: =false
+        txtSetValAdmin As text:
+            X: =346
+            Y: =4
+            Width: =360
+            Height: =44
+            HintText: ="value"
+            Default: =ThisItem.SettingValue
+            Size: =14
+            OnChange: =false
+            DelayOutput: =false
+            DisplayMode: =If(varRole = "Admin", DisplayMode.Edit, DisplayMode.View)
+        btnSetSaveAdmin As button:
+            X: =720
+            Y: =6
+            Width: =100
+            Height: =40
+            Text: ="Save"
+            OnSelect: |-
+                =Set(varLastActivity, Now());
+                IfError(
+                    Patch(POUSettings, ThisItem, {SettingValue: Trim(txtSetValAdmin.Text)});
+                    Notify("Saved " & ThisItem.SettingKey, NotificationType.Success),
+                    Notify("NOT saved: " & FirstError.Message, NotificationType.Error)
+                )
+            Fill: =RGBA(84, 130, 53, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            Size: =13
+            HoverFill: =ColorFade(RGBA(84, 130, 53, 1), -15%)
+            PressedFill: =ColorFade(RGBA(84, 130, 53, 1), -30%)
+            RadiusTopLeft: =4
+            RadiusTopRight: =4
+            RadiusBottomLeft: =4
+            RadiusBottomRight: =4
+            DisplayMode: =If(varRole = "Admin", DisplayMode.Edit, DisplayMode.Disabled)
+    lblLocTitleAdmin As label:
+        X: =950
+        Y: =104
+        Width: =390
+        Height: =28
+        Text: ="Locations"
+        Size: =16
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    txtNewLocAdmin As text:
+        X: =950
+        Y: =136
+        Width: =250
+        Height: =44
+        HintText: ="New location code"
+        Default: =""
+        Size: =18
+        OnChange: =Set(varLastActivity, Now())
+        DelayOutput: =false
+        DisplayMode: =If(varRole = "Admin", DisplayMode.Edit, DisplayMode.Disabled)
+        TabIndex: =2
+    btnNewLocAdmin As button:
+        X: =1210
+        Y: =136
+        Width: =130
+        Height: =44
+        Text: ="Add"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            If(
+                Len(Upper(Trim(Substitute(txtNewLocAdmin.Text, "*", "")))) > 0 And IsBlank(LookUp(POULocations, LocationCode = Upper(Trim(Substitute(txtNewLocAdmin.Text, "*", ""))))),
+                IfError(
+                    Patch(POULocations, Defaults(POULocations), {Title: Upper(Trim(Substitute(txtNewLocAdmin.Text, "*", ""))), LocationCode: Upper(Trim(Substitute(txtNewLocAdmin.Text, "*", ""))), Description: "", Active: true});
+                    Reset(txtNewLocAdmin);
+                    Notify("Location added", NotificationType.Success),
+                    Notify("NOT added: " & FirstError.Message, NotificationType.Error)
+                ),
+                Notify("Enter a new location code that is not already in the list.", NotificationType.Warning)
+            )
+        Fill: =RGBA(84, 130, 53, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(84, 130, 53, 1), -15%)
+        PressedFill: =ColorFade(RGBA(84, 130, 53, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        DisplayMode: =If(varRole = "Admin", DisplayMode.Edit, DisplayMode.Disabled)
+        TabIndex: =3
+    galLocListAdmin As gallery.galleryVertical:
+        X: =950
+        Y: =186
+        Width: =390
+        Height: =250
+        TemplateSize: =44
+        Items: =SortByColumns(POULocations, "LocationCode", SortOrder.Ascending)
+        lblLocRowAdmin As label:
+            X: =8
+            Y: =4
+            Width: =370
+            Height: =36
+            Text: =ThisItem.LocationCode & If(ThisItem.Active, "", "  (inactive)")
+            Size: =14
+            Color: =RGBA(32, 32, 32, 1)
+            Fill: =RGBA(0, 0, 0, 0)
+            Align: =Align.Left
+            FontWeight: =FontWeight.Normal
+            Wrap: =true
+            AutoHeight: =false
+    lblStnTitleAdmin As label:
+        X: =950
+        Y: =446
+        Width: =390
+        Height: =28
+        Text: ="Stations (editable; no code change needed to add a cabinet PC)"
+        Size: =14
+        Color: =RGBA(32, 32, 32, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    galStnAdmin As gallery.galleryVertical:
+        X: =950
+        Y: =478
+        Width: =390
+        Height: =240
+        TemplateSize: =44
+        Items: =SortByColumns(POUStations, "StationID", SortOrder.Ascending)
+        lblStnRowAdmin As label:
+            X: =8
+            Y: =4
+            Width: =370
+            Height: =36
+            Text: =ThisItem.StationID & "  " & Coalesce(ThisItem.StationName, "") & If(ThisItem.Active, "", " (inactive)") & "  " & Coalesce(ThisItem.ExpectedAccountUPN, "")
+            Size: =12
+            Color: =RGBA(32, 32, 32, 1)
+            Fill: =RGBA(0, 0, 0, 0)
+            Align: =Align.Left
+            FontWeight: =FontWeight.Normal
+            Wrap: =true
+            AutoHeight: =false
+    lblAdmNoteAdmin As label:
+        X: =24
+        Y: =726
+        Width: =900
+        Height: =32
+        Text: ="Stations, employees and badge IDs are maintained in the SharePoint lists directly (admin only). Opening balances and adjustments are on the Supervisor screen."
+        Size: =12
+        Color: =RGBA(110, 110, 110, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Left
+        FontWeight: =FontWeight.Normal
+        Wrap: =true
+        AutoHeight: =false

@@ -2,6 +2,8 @@ import base64
 import csv
 import io
 import re
+import os
+
 import pytest
 from datetime import datetime, timedelta, timezone
 from test_flow_basic import env, opening   # noqa: F401
@@ -216,18 +218,19 @@ def test_monitor_reports_each_failed_or_stuck_item_once(env):
 def test_reports_are_complete_beyond_2000_and_5000_rows(env):
     recipients(env)
     env.clock.advance(MON)
-    N = 5300
+    N = int(os.environ.get("POU_LARGE_N", "5300"))      # set POU_LARGE_N=600 for a quick run
     env.fake.bulk_load("POUStockLocations", [
         {"Title": f"S{i}", "StockKey": f"S{i}|1-A", "ItemID": f"S{i}", "LocationCode": "1-A", "ItemName": "x", "MinQty": 1, "MaxQty": 5, "OnHandQty": 3,
          "StockVersion": 1, "BalanceStatus": "Verified", "LowStockFlag": False, "Active": True} for i in range(N)])
     env.fake.bulk_load("POULedger", [{"Title": f"S{i}", "LedgerKey": f"S{i}|1-A#1", "RequestID": f"RS{i}", "LedgerType": "OPENING", "Origin": "Live", "AffectsBalance": True,
                                        "PostingState": "Posted", "StockKey": f"S{i}|1-A", "SeqNo": 1, "QtyBefore": None, "QtyAfter": 3} for i in range(N)])
-    assert env.fake.count("POUStockLocations") > 5000
-    # the naive server-side filter that matches > 5,000 rows is REFUSED by SharePoint, even on an indexed column:
     from pou_tools.spclient import SpError
-    with pytest.raises(SpError) as e:
-        list(env.c(SITE_OWNER).query("POUStockLocations", "Active eq 1"))
-    assert e.value.is_threshold
+    if N > 5000:
+        assert env.fake.count("POUStockLocations") > 5000
+        # the naive server-side filter that matches > 5,000 rows is REFUSED by SharePoint, even on an indexed column:
+        with pytest.raises(SpError) as e:
+            list(env.c(SITE_OWNER).query("POUStockLocations", "Active eq 1"))
+        assert e.value.is_threshold
     # ... while ID-ordered paging returns every row:
     assert sum(1 for _ in env.c(SITE_OWNER).query("POUStockLocations", top=500)) == N + 1       # + the fixture's own record
     # reconcile walks all 5,300 rows

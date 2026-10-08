@@ -1,0 +1,209 @@
+scrLogin As screen:
+    Fill: =RGBA(31, 56, 100, 1)
+    OnVisible: |-
+        =Set(varBusy, false);
+        Set(varLoginMsg, "");
+        Set(varSession, "");
+        Set(varSupMode, false);
+        UpdateContext({locBadgePending: false, locLastKey: Now()});
+        Reset(txtBadge);
+        SetFocus(txtBadge)
+    recLoginBg As rectangle:
+        X: =0
+        Y: =0
+        Width: =1366
+        Height: =768
+        Fill: =RGBA(31, 56, 100, 1)
+    lblLoginTitle As label:
+        X: =0
+        Y: =70
+        Width: =1366
+        Height: =60
+        Text: ="Point-of-Use Inventory"
+        Size: =40
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Center
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    lblLoginStation As label:
+        X: =100
+        Y: =140
+        Width: =1166
+        Height: =60
+        Text: =If(IsBlank(varStation), "NO STATION SET UP ON THIS PC - see START_HERE / Admin: open the app with ?StationID=<id> or assign this Microsoft account to a station", "Station " & varStation)
+        Size: =22
+        Color: =RGBA(255, 230, 153, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Center
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    lblLoginPrompt As label:
+        X: =0
+        Y: =240
+        Width: =1366
+        Height: =50
+        Text: ="Scan your badge"
+        Size: =30
+        Color: =RGBA(255, 255, 255, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Center
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+    txtBadge As text:
+        X: =443
+        Y: =300
+        Width: =480
+        Height: =64
+        HintText: ="Scan badge"
+        Default: =""
+        Size: =28
+        OnChange: =UpdateContext({locBadgePending: true, locLastKey: Now()})
+        DelayOutput: =false
+        DisplayMode: =If(varBusy Or IsBlank(varStation), DisplayMode.Disabled, DisplayMode.Edit)
+        TabIndex: =1
+    btnLogin As button:
+        X: =543
+        Y: =380
+        Width: =280
+        Height: =56
+        Text: ="Sign in"
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            UpdateContext({locBadgePending: false});
+            If(
+                varBusy Or IsBlank(varStation),
+                false,
+                With(
+                    {b: Substitute(Trim(txtBadge.Text), "*", "")},
+                    If(
+                        Len(b) < varScanMin,
+                        Set(varLoginMsg, "Scan your badge."),
+                        Set(varBusy, true);
+                        Reset(txtBadge);
+                        Set(varLogin, IfError(
+                            'POU-Session'.Run("LOGIN", b, varStation, "", Lower(User().Email)),
+                            {ok: "no", code: "NETWORK", message: "Could not reach the server, so you are NOT signed in. Try again.", sessionId: "", employeeName: "", role: "", idleMinutes: ""}));
+                        If(
+                            varLogin.ok = "yes",
+                            Set(varSession, varLogin.sessionId);
+                            Set(varEmpName, varLogin.employeeName);
+                            Set(varRole, varLogin.role);
+                            Set(varSupMode, false);
+                            Set(varLoginMsg, "");
+                            Set(varOutKind, ""); Set(varOutText, "");
+                            If(
+                                IsBlank(varReq) And CountRows(Filter(colOutbox, Station = varStation)) > 0,
+                                Set(varReq, First(Filter(colOutbox, Station = varStation)));
+                                Set(varOutKind, "unconfirmed");
+                                Set(varOutText, "An earlier request on this station was never confirmed (" & varReq.Summary & "). Do not re-enter it: press 'Retry same request'.")
+                            );
+                            Set(varLastActivity, Now());
+                            Navigate(scrScan, ScreenTransition.None),
+                            Set(varLoginMsg, varLogin.message)
+                        );
+                        Set(varBusy, false)
+                    )
+                )
+            )
+        Fill: =RGBA(68, 114, 196, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(68, 114, 196, 1), -15%)
+        PressedFill: =ColorFade(RGBA(68, 114, 196, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        DisplayMode: =If(varBusy Or IsBlank(varStation), DisplayMode.Disabled, DisplayMode.Edit)
+        TabIndex: =2
+    lblLoginMsg As label:
+        X: =343
+        Y: =450
+        Width: =680
+        Height: =70
+        Text: =varLoginMsg
+        Size: =20
+        Color: =RGBA(255, 199, 206, 1)
+        Fill: =RGBA(255, 255, 255, 1)
+        Align: =Align.Center
+        FontWeight: =FontWeight.Bold
+        Wrap: =true
+        AutoHeight: =false
+        Visible: =Not(IsBlank(varLoginMsg))
+    btnSupSignIn As button:
+        X: =443
+        Y: =580
+        Width: =480
+        Height: =56
+        Text: ="Continue as supervisor: " & Coalesce(varMeEmp.EmployeeName, "")
+        OnSelect: |-
+            =Set(varLastActivity, Now());
+            Set(varSession, "");
+            Set(varEmpName, varMeEmp.EmployeeName);
+            Set(varRole, varMeEmp.Role.Value);
+            Set(varSupMode, true);
+            Set(varLastActivity, Now());
+            Navigate(scrSupervisor, ScreenTransition.None)
+        Fill: =RGBA(84, 130, 53, 1)
+        Color: =RGBA(255, 255, 255, 1)
+        Size: =16
+        HoverFill: =ColorFade(RGBA(84, 130, 53, 1), -15%)
+        PressedFill: =ColorFade(RGBA(84, 130, 53, 1), -30%)
+        RadiusTopLeft: =4
+        RadiusTopRight: =4
+        RadiusBottomLeft: =4
+        RadiusBottomRight: =4
+        DisplayMode: =DisplayMode.Edit
+        Visible: =varIsPriv
+        TabIndex: =3
+    lblLoginFoot As label:
+        X: =0
+        Y: =730
+        Width: =1366
+        Height: =30
+        Text: ="Signed in to Microsoft as " & User().Email & "  |  app build " & varBuild & "  |  " & If(varSettingsOk, "settings loaded", "SETTINGS NOT LOADED - using defaults")
+        Size: =12
+        Color: =RGBA(200, 200, 200, 1)
+        Fill: =RGBA(0, 0, 0, 0)
+        Align: =Align.Center
+        FontWeight: =FontWeight.Normal
+        Wrap: =true
+        AutoHeight: =false
+    tmrBadge As timer:
+        X: =0
+        Y: =0
+        Width: =6
+        Height: =6
+        Duration: =150
+        Repeat: =true
+        AutoStart: =false
+        Start: =true
+        OnTimerEnd: |-
+            =If(
+                locBadgePending And DateDiff(locLastKey, Now(), Milliseconds) >= varScanIdle,
+                Select(btnLogin)
+            )
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(0, 0, 0, 0)
+        BorderThickness: =0
+        BorderColor: =RGBA(0, 0, 0, 0)
+        DisplayMode: =DisplayMode.View
+    tmrLoginTick As timer:
+        X: =0
+        Y: =0
+        Width: =6
+        Height: =6
+        Duration: =1000
+        Repeat: =true
+        AutoStart: =false
+        Start: =true
+        OnTimerEnd: =Set(varTick, Now())
+        Fill: =RGBA(0, 0, 0, 0)
+        Color: =RGBA(0, 0, 0, 0)
+        BorderThickness: =0
+        BorderColor: =RGBA(0, 0, 0, 0)
+        DisplayMode: =DisplayMode.View

@@ -118,6 +118,15 @@ def _type_name(v):
     return type(v).__name__
 
 
+def _hkey(v):
+    """Hashable canonical key with the same equality as strict_eq (type-strict, deep)."""
+    import json
+    try:
+        return json.dumps(v, sort_keys=True, default=str)
+    except TypeError:
+        return repr(v)
+
+
 def strict_eq(a, b):
     if isinstance(a, bool) or isinstance(b, bool):
         return isinstance(a, bool) and isinstance(b, bool) and a == b
@@ -417,13 +426,16 @@ def call(name: str, args: list, ev, ctx: Ctx):
             r = {}
             for x in a: r.update(x)
             return r
-        r = []
+        r, seen = [], set()
         for x in a:
             for y in x:
-                if not any(strict_eq(y, z) for z in r): r.append(y)
+                k = _hkey(y)
+                if k not in seen:
+                    seen.add(k); r.append(y)
         return r
     if n == "intersection":
-        return [x for x in a[0] if any(strict_eq(x, y) for y in a[1])]
+        other = {_hkey(y) for y in a[1]}
+        return [x for x in a[0] if _hkey(x) in other]
     if n == "setProperty":
         d = dict(a[0]); d[a[1]] = a[2]; return d
     if n == "addProperty":
